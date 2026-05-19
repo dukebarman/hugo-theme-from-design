@@ -113,7 +113,7 @@ Read `references/ux-ui-checklist.md` before final visual verification. Treat it 
 - then check responsive behavior, accessibility, interaction states, content density, and Hugo-specific authoring ergonomics;
 - do not add marketing copy or feature explanations unless the design calls for them.
 
-Use browser screenshots when a local server can run. Check desktop and mobile widths. Firefox on macOS may need a temporary profile for headless screenshots when a regular Firefox session is already open, for example `firefox --headless --profile /tmp/<profile> --screenshot /tmp/<theme>.png --window-size 1440,1000 <url>`. Fix text overflow, overlapping UI, broken image crops, illegible contrast, broken controls, and navigation states.
+Use browser screenshots when a local server can run. Prefer whatever headless browser is available in the environment, such as Playwright, Chromium/Chrome, Firefox, WebKit, or another browser already installed by the project. Check desktop and mobile widths. If Firefox on macOS is used while a regular Firefox session is open, run it with a temporary profile, for example `firefox --headless --profile /tmp/<profile> --screenshot /tmp/<theme>.png --window-size 1440,1000 <url>`. If no browser screenshot tool is available, report that visual verification was limited to Hugo build, rendered HTML, and CSS/DOM inspection. Fix text overflow, overlapping UI, broken image crops, illegible contrast, broken controls, and navigation states.
 
 ## Validation Script
 
