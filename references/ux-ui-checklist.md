@@ -11,6 +11,8 @@ Use this as a lightweight embedded frontend-design review when translating a Fig
 - Match type scale by role, not by copying oversized text everywhere.
 - Keep spacing systematic. Repeated components should share the same padding, gaps, radii, and media ratios.
 - Use real design assets when available. Do not hide weak asset handling behind dark overlays, blur, or generic gradients.
+- If a reference shows light and dark theme states side by side, verify the generated page supports both states as modes instead of freezing the screenshot's split view into the live layout.
+- Check generated demo assets against the reference for missing or clipped details; sample logos, badges, icons, and screenshots should not silently drop letters or visual elements.
 
 ## Responsive Behavior
 
@@ -19,6 +21,7 @@ Use this as a lightweight embedded frontend-design review when translating a Fig
 - Ensure long titles, menu labels, tags, dates, and author names wrap cleanly.
 - Define stable dimensions for repeated cards, image containers, icon buttons, and toolbars.
 - Do not let hover/focus/loading states resize layouts.
+- Keep primary content before secondary navigation/filter sidebars on narrow blog, docs, and list pages unless the design explicitly prioritizes filtering first.
 
 ## Accessibility
 
@@ -26,6 +29,7 @@ Use this as a lightweight embedded frontend-design review when translating a Fig
 - Keep text contrast legible in light and dark modes.
 - Add useful alt text for content images and empty alt for decorative images.
 - Ensure keyboard focus is visible on links, buttons, menus, search, toggles, and pagination.
+- Verify interactive controls actually bind in the rendered browser when scripts are emitted from `<head>`; theme toggles and menus should work after initial page load.
 - Respect reduced motion when adding transitions or animations.
 
 ## Content And Authoring

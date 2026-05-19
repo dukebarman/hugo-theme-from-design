@@ -36,6 +36,8 @@ For PNG/JPG-only sources, infer layout deliberately:
 
 When the design is a screenshot of a site inside a browser/device frame, implement the site inside the frame, not the frame itself. Use the presentation wrapper only for `images/screenshot.*`, marketing previews, or docs unless the user explicitly asks for an in-page browser mockup.
 
+When a reference shows light and dark appearances simultaneously, treat it as a color-mode specification by default, not as a permanent split-screen layout. Implement one coherent theme with light and dark token sets, a visible toggle when the reference shows one, and sensible initialization from stored preference or `prefers-color-scheme`. Preserve the simultaneous light/dark composition only for preview images or when the user explicitly asks for a split-mode page.
+
 When updating an existing theme, keep its public configuration and content conventions stable unless the user asks for a breaking redesign.
 
 ## New Variant Vs Update
@@ -85,6 +87,8 @@ Ensure child templates define the same blocks used by the base template, typical
 
 If config params allow Markdown for visible text, render visible text with `markdownify` but sanitize metadata attributes with `markdownify | plainify` before placing them in `<meta>` tags, `title`, `aria-label`, or other plain-text attributes.
 
+If JavaScript wires visible controls such as color-mode toggles, mobile menus, language buttons, search, or filters, ensure the code runs after the relevant DOM exists. Prefer `defer` in the script tag or bind events on `DOMContentLoaded` when scripts are emitted in `<head>`. Verify that the control works in a browser, not only that Hugo builds.
+
 Do not delete user layouts, params, content, translations, or generated visual assets just because they are outside the current design. Work around them or preserve compatibility.
 
 Use these commands as the baseline:
@@ -109,7 +113,7 @@ Read `references/ux-ui-checklist.md` before final visual verification. Treat it 
 - then check responsive behavior, accessibility, interaction states, content density, and Hugo-specific authoring ergonomics;
 - do not add marketing copy or feature explanations unless the design calls for them.
 
-Use browser screenshots when a local server can run. Check desktop and mobile widths. Fix text overflow, overlapping UI, broken image crops, illegible contrast, and navigation states.
+Use browser screenshots when a local server can run. Check desktop and mobile widths. Firefox on macOS may need a temporary profile for headless screenshots when a regular Firefox session is already open, for example `firefox --headless --profile /tmp/<profile> --screenshot /tmp/<theme>.png --window-size 1440,1000 <url>`. Fix text overflow, overlapping UI, broken image crops, illegible contrast, broken controls, and navigation states.
 
 ## Validation Script
 
