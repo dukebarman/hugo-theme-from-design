@@ -17,7 +17,8 @@ Default to generating a new theme variant from the design reference. Update or m
    - templates in `layouts/`, with a base template, page/list or page/section/home templates, and reusable partials;
    - CSS/Sass/JS/images in `assets/` when they should go through Hugo Pipes, or `static/` when copied as-is;
    - design-matching demo content and config in `exampleSite/`;
-   - theme parameters in config instead of hard-coded copy when users should customize them.
+   - theme parameters in config instead of hard-coded copy when users should customize them;
+   - homepage selection rules, such as `featured = true`, when the design shows a specific post or project instead of a generic latest-item feed.
 6. Generate `exampleSite` for new variants by default. Its pages, sections, menus, params, sample images, and front matter should demonstrate the received design, not generic placeholder content. Move or remove the sample Markdown created by `hugo new theme` in the theme root `content/`; root `content/` can stay as an empty skeleton directory, but demo pages belong in `exampleSite/content/`.
 7. Implement visually first, then wire content behavior. Match spacing, hierarchy, color, typography, breakpoints, navigation, cards, media treatment, and states from the actual site UI in the design reference before adding optional features.
 8. Validate with `scripts/hugo_theme_check.py` and a real Hugo build/server. Fix template errors, broken assets, missing metadata, responsive regressions, and obvious UX issues before finishing.
@@ -79,6 +80,8 @@ Prefer the repo's current Hugo style:
 For Hugo `v0.146+`, prefer the modern template layout for new work unless the repository clearly uses legacy conventions. For existing themes, do not migrate `_default` to root templates or `partials` to `_partials` as an incidental change; only migrate when the user asks or Hugo build errors require it.
 
 Ensure child templates define the same blocks used by the base template, typically `{{ define "main" }}`. When calling partials that need page/site data, pass context explicitly with `.` or a focused `dict`.
+
+If config params allow Markdown for visible text, render visible text with `markdownify` but sanitize metadata attributes with `markdownify | plainify` before placing them in `<meta>` tags, `title`, `aria-label`, or other plain-text attributes.
 
 Do not delete user layouts, params, content, translations, or generated visual assets just because they are outside the current design. Work around them or preserve compatibility.
 

@@ -35,7 +35,9 @@ For new variants, `exampleSite` is part of the deliverable, not an optional extr
 - Does every child template define the blocks expected by the base template?
 - Are partials passed the context they need?
 - Are home, page/single, section/list, taxonomy/term, RSS, 404, and pagination covered when relevant?
+- If the design shows a specific homepage item, is that controlled by front matter/config rather than accidentally relying on date order?
 - Are archetypes aligned with the front matter the design expects?
+- Are Markdown-enabled params sanitized before being used in meta tags or HTML attributes?
 - Does `exampleSite` demonstrate the design with real sections, config params, menus, and content states?
 - Did `hugo new theme` leave sample Markdown in root `content/` that should be moved to `exampleSite/content/` or removed?
 - Are `exampleSite/public/` and `.hugo_build.lock` absent from the source deliverable?

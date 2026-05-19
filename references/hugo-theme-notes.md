@@ -104,7 +104,9 @@ Do not copy these themes wholesale. Use them as local examples for structure, pa
 - Use Hugo image/resource pipelines for theme-owned assets that need fingerprinting, minification, resizing, or Sass compilation.
 - Prefer semantic HTML landmarks: `header`, `nav`, `main`, `article`, `section`, `aside`, `footer`.
 - Use `.IsHome`, `.Kind`, `.Section`, `.Type`, `.Params`, `.Site.Params`, menus, taxonomies, and partial dicts intentionally instead of duplicating templates.
+- When the homepage design highlights a specific article/project, support an explicit front matter flag such as `featured = true` instead of assuming the latest dated content should appear first.
 - Keep templates resilient when params are missing. Use `with`, `default`, and `or` where appropriate.
+- Treat config params differently depending on output context: `markdownify` is appropriate for visible rich text, while metadata/attribute contexts should use plain text such as `{{ . | markdownify | plainify }}`.
 - Preserve multilingual/i18n conventions if the theme has `i18n/` or language menus.
 - Match base template blocks and child template definitions. If `baseof.html` exposes `{{ block "main" . }}`, each rendering template should define `{{ define "main" }}`.
 - Pass context to partials explicitly: `{{ partial "header.html" . }}` or `{{ partial "card.html" (dict "page" . "featured" true) }}`. Missing context is a frequent cause of confusing template failures.
