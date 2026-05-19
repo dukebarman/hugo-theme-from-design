@@ -96,14 +96,16 @@ Use content-type templates (`layouts/posts/list.html`, `layouts/portfolio/single
 For new theme variants, choose the modern layout when targeting current Hugo. For existing themes, follow the existing convention unless migration is explicitly in scope.
 For ports of known themes, follow the source theme's layout convention unless the user explicitly asks for modernization.
 
-## Useful Local Examples
+## Optional Local Examples
 
-When this skill is used from this repository, inspect:
+When a workspace includes downloaded example themes, inspect them for structure and conventions. Prefer examples that include:
 
-- `example_themes/mana`: rich blog theme with `baseof.html`, `home.html`, many partials, CSS/JS assets, multilingual support, and detailed `theme.toml`.
-- `example_themes/nomad-tech`: portfolio/blog theme with `exampleSite`, section-specific layouts, SCSS, and a simpler metadata file.
+- a complete `exampleSite`;
+- section-specific layouts and reusable partials;
+- clear theme metadata in `theme.toml`;
+- modern asset handling with Hugo Pipes or a documented build pipeline.
 
-Do not copy these themes wholesale. Use them as local examples for structure, partial organization, metadata, and Hugo build conventions.
+Do not assume these paths exist in every installation, and do not copy example themes wholesale. Use available examples only for structure, partial organization, metadata, and Hugo build conventions.
 
 ## Implementation Patterns
 

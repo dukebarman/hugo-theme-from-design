@@ -55,7 +55,7 @@ For an update/migration from an old theme:
 
 ## ExampleSite Generation
 
-For every new theme variant, create `exampleSite/` inside the theme. Model the structure after mature themes such as `example_themes/nomad-tech/exampleSite`, but tailor content to the received design.
+For every new theme variant, create `exampleSite/` inside the theme. Model the structure after mature Hugo themes or any local examples present in the workspace, but tailor content to the received design.
 
 The minimum useful `exampleSite` includes:
 - `exampleSite/hugo.toml` with `baseURL`, `languageCode`, `title`, `theme = "<theme-folder-name>"`, menus, taxonomies, and `[params]` values needed by the design;
