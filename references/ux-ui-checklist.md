@@ -5,6 +5,8 @@ Use this as a lightweight embedded frontend-design review when translating a Fig
 ## Visual Match
 
 - Compare the rendered page to the reference at equivalent viewport widths.
+- Identify presentation wrappers before implementation. Browser chrome, device bezels, wallpaper gradients, large shadows, and gallery/poster backgrounds in a reference image are usually screenshot presentation, not live theme UI.
+- Implement the website surface shown inside the wrapper by default. Recreate the outer browser/device frame only for preview images or when the user explicitly asks for that UI in the page.
 - Preserve hierarchy: primary action, page title, section rhythm, density, and reading order.
 - Match type scale by role, not by copying oversized text everywhere.
 - Keep spacing systematic. Repeated components should share the same padding, gaps, radii, and media ratios.

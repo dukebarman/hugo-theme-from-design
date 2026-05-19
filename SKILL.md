@@ -12,14 +12,15 @@ Default to generating a new theme variant from the design reference. Update or m
 1. Establish the target: new variant, update to an existing theme, migration from an old theme, or repair. Identify the design source (Figma, PNG/JPG screenshot, design tokens, existing site) and the expected Hugo version/content model.
 2. Inspect the repository before editing: `hugo version`, `find . -maxdepth 3`, theme `layouts/`, `assets/`, `static/`, `content/`, `data/`, `i18n/`, config files, `theme.toml`, and any `exampleSite`. Detect whether the theme uses the modern Hugo template layout (`layouts/_partials`, root `baseof.html`, `home.html`, `page.html`, `section.html`) or legacy-compatible layout (`layouts/partials`, `layouts/_default/*`).
 3. If creating the default new variant, prefer `hugo new theme <variant-name>` when Hugo is installed. Preserve Hugo's generated skeleton and build on top of it instead of inventing a custom structure.
-4. Translate the design into Hugo boundaries:
+4. Separate the actual website UI from presentation context. If a PNG/JPG shows a browser window, device mockup, gradient poster background, drop shadow, or gallery frame around the site, treat those as preview/presentation chrome unless the user explicitly asks to make them part of the live theme.
+5. Translate the design into Hugo boundaries:
    - templates in `layouts/`, with a base template, page/list or page/section/home templates, and reusable partials;
    - CSS/Sass/JS/images in `assets/` when they should go through Hugo Pipes, or `static/` when copied as-is;
    - design-matching demo content and config in `exampleSite/`;
    - theme parameters in config instead of hard-coded copy when users should customize them.
-5. Generate `exampleSite` for new variants by default. Its pages, sections, menus, params, sample images, and front matter should demonstrate the received design, not generic placeholder content. Move or remove the sample Markdown created by `hugo new theme` in the theme root `content/`; root `content/` can stay as an empty skeleton directory, but demo pages belong in `exampleSite/content/`.
-6. Implement visually first, then wire content behavior. Match spacing, hierarchy, color, typography, breakpoints, navigation, cards, media treatment, and states from the design reference before adding optional features.
-7. Validate with `scripts/hugo_theme_check.py` and a real Hugo build/server. Fix template errors, broken assets, missing metadata, responsive regressions, and obvious UX issues before finishing.
+6. Generate `exampleSite` for new variants by default. Its pages, sections, menus, params, sample images, and front matter should demonstrate the received design, not generic placeholder content. Move or remove the sample Markdown created by `hugo new theme` in the theme root `content/`; root `content/` can stay as an empty skeleton directory, but demo pages belong in `exampleSite/content/`.
+7. Implement visually first, then wire content behavior. Match spacing, hierarchy, color, typography, breakpoints, navigation, cards, media treatment, and states from the actual site UI in the design reference before adding optional features.
+8. Validate with `scripts/hugo_theme_check.py` and a real Hugo build/server. Fix template errors, broken assets, missing metadata, responsive regressions, and obvious UX issues before finishing.
 
 ## Design Intake
 
@@ -29,7 +30,10 @@ For PNG/JPG-only sources, infer layout deliberately:
 - measure the viewport and major regions before coding;
 - identify repeated components and convert them to partials;
 - preserve information hierarchy over pixel-perfect trivia;
-- avoid using a screenshot as the UI background except for explicit mockups.
+- avoid using a screenshot as the UI background except for explicit mockups;
+- identify whether gradients, browser chrome, device bezels, rounded outer cards, shadows, and wallpaper are part of the actual website or only a presentation wrapper.
+
+When the design is a screenshot of a site inside a browser/device frame, implement the site inside the frame, not the frame itself. Use the presentation wrapper only for `images/screenshot.*`, marketing previews, or docs unless the user explicitly asks for an in-page browser mockup.
 
 When updating an existing theme, keep its public configuration and content conventions stable unless the user asks for a breaking redesign.
 
@@ -56,6 +60,10 @@ The minimum useful `exampleSite` includes:
 - sample front matter for design-specific fields such as hero images, eyebrow text, CTAs, featured flags, authors, tags, dates, summaries, external links, and gallery assets.
 
 Keep generated demo content credible but lightweight. Do not put built output such as `public/` or `.hugo_build.lock` into the theme unless the user explicitly wants generated artifacts.
+
+## Production Readiness
+
+For quick design tests, keep the theme focused and small. For a publishable GitHub theme or a theme intended for `themes.gohugo.io`, read the production checklist in `references/hugo-theme-notes.md` and add the expected package surface: README, license, richer `exampleSite`, favicon/webmanifest assets, 404/RSS/templates, responsive mobile navigation, code styles when posts include code, and documented params.
 
 ## Hugo Implementation Rules
 
@@ -105,9 +113,10 @@ Run the bundled checker from the skill directory:
 ```bash
 python3 scripts/hugo_theme_check.py --theme-dir /path/to/theme
 python3 scripts/hugo_theme_check.py --theme-dir /path/to/theme --site-dir /path/to/site
+python3 scripts/hugo_theme_check.py --theme-dir /path/to/theme --publication
 ```
 
-The checker emits JSON with `errors`, `warnings`, `info`, and an overall `ok` flag. Use it for fast structural validation; still run Hugo itself and inspect the rendered site for visual quality.
+The checker emits JSON with `errors`, `warnings`, `info`, and an overall `ok` flag. Use it for fast structural validation; add `--publication` when preparing a GitHub/public theme package. Still run Hugo itself and inspect the rendered site for visual quality.
 
 ## Completion Criteria
 

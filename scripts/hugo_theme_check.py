@@ -22,6 +22,15 @@ except ModuleNotFoundError:  # pragma: no cover - Python < 3.11 fallback
 REQUIRED_DIRS = ["archetypes", "assets", "content", "data", "i18n", "layouts", "static"]
 THEMES_SITE_REQUIRED_META = ["name", "license", "licenselink", "description", "homepage"]
 BUILD_ARTIFACTS = ["public", ".hugo_build.lock", "resources/_gen"]
+README_FILES = ["README.md", "README.markdown", "README"]
+LICENSE_FILES = ["LICENSE", "LICENSE.md", "COPYING"]
+FAVICON_CANDIDATES = [
+    "static/favicon.ico",
+    "static/favicon.svg",
+    "assets/icons/favicon.ico",
+    "assets/icons/favicon.svg",
+    "assets/icons/site.webmanifest",
+]
 
 
 def add(result: dict, level: str, message: str, path: Path | None = None) -> None:
@@ -116,6 +125,10 @@ def layout_exists(layouts_dir: Path, candidates: tuple[str, ...]) -> bool:
     return any((layouts_dir / candidate).exists() for candidate in candidates)
 
 
+def any_exists(base: Path, candidates: list[str]) -> bool:
+    return any((base / candidate).exists() for candidate in candidates)
+
+
 def detect_build_command(theme_dir: Path, site_dir: Path | None) -> tuple[Path, list[str]] | None:
     theme_name = theme_dir.name
     if site_dir is not None:
@@ -133,6 +146,7 @@ def main() -> int:
     parser.add_argument("--theme-dir", required=True, type=Path, help="Path to the Hugo theme directory")
     parser.add_argument("--site-dir", type=Path, help="Optional Hugo site directory for smoke build")
     parser.add_argument("--skip-build", action="store_true", help="Skip the Hugo smoke build")
+    parser.add_argument("--publication", action="store_true", help="Run additional GitHub/themes.gohugo.io package checks")
     parser.add_argument("--timeout", type=int, default=60, help="Hugo command timeout in seconds")
     args = parser.parse_args()
 
@@ -183,6 +197,18 @@ def main() -> int:
 
         if not any((theme_dir / name).exists() for name in ("hugo.toml", "config.toml", "config.yaml", "config.json")):
             add(result, "warnings", "No root Hugo config file found in theme directory")
+
+        if args.publication:
+            if not any_exists(theme_dir, README_FILES):
+                add(result, "warnings", "Publication check: missing README.md")
+            if not any_exists(theme_dir, LICENSE_FILES):
+                add(result, "warnings", "Publication check: missing LICENSE file")
+            if not layout_exists(layouts_dir, ("404.html", "_default/404.html")):
+                add(result, "warnings", "Publication check: missing 404 layout", layouts_dir)
+            if not layout_exists(layouts_dir, ("_default/rss.xml", "rss.xml")):
+                add(result, "warnings", "Publication check: missing RSS layout", layouts_dir)
+            if not any_exists(theme_dir, FAVICON_CANDIDATES):
+                add(result, "warnings", "Publication check: no favicon or webmanifest asset detected")
 
         root_content = theme_dir / "content"
         if root_content.exists():

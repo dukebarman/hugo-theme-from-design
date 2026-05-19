@@ -24,6 +24,18 @@ For themes intended for `themes.gohugo.io`, check:
 - if forked or ported, document why it is notably different and preserve original licensing requirements;
 - no paid-theme gating or README-as-advertisement for a paid variant.
 
+For GitHub publication, also prefer:
+
+- clean `.gitignore` excluding `.DS_Store`, Python caches, Hugo build output, `exampleSite/public/`, `.hugo_build.lock`, and generated resource caches;
+- `README.md` with install, configuration, screenshots, exampleSite build command, and supported Hugo version;
+- `LICENSE` matching `theme.toml`;
+- `CHANGELOG.md` only when versioning/releasing the theme;
+- favicon/webmanifest/icon assets when the theme owns head metadata;
+- 404, RSS, list, single, taxonomy/term, and search/ToC/comment templates when advertised;
+- mobile navigation and keyboard-accessible controls;
+- code highlighting styles when sample posts include code;
+- documented params such as `mainSections`, `dateFormat`, `defaultColor`, author/avatar/social fields, footer, and optional analytics/comments.
+
 ## Common Hugo Theme Layouts
 
 Modern Hugo template layout:
@@ -86,6 +98,7 @@ Do not copy these themes wholesale. Use them as local examples for structure, pa
 
 ## Implementation Patterns
 
+- Distinguish real UI from presentation screenshots. If a design image shows the site inside browser chrome, a laptop/device frame, or a gradient poster background, do not put that wrapper in `baseof.html` by default. Implement the actual website surface, and use the wrapper only for generated preview images or explicit mockup pages.
 - Put visual tokens in CSS custom properties or Sass variables where the existing pipeline supports it.
 - Keep navigation, footer links, socials, CTA labels, and hero content configurable through site params when practical.
 - Use Hugo image/resource pipelines for theme-owned assets that need fingerprinting, minification, resizing, or Sass compilation.
