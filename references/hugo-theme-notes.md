@@ -24,6 +24,14 @@ For themes intended for `themes.gohugo.io`, check:
 - if forked or ported, document why it is notably different and preserve original licensing requirements;
 - no paid-theme gating or README-as-advertisement for a paid variant.
 
+For ports/reimplementations of known themes:
+
+- preserve `[original]` metadata in `theme.toml` with author/homepage/repo when the source theme is not original work;
+- keep license and attribution aligned with the upstream theme;
+- prefer the upstream package architecture when recognizable, such as Poole/Hyde split CSS, print/syntax CSS, theme color classes, reverse-layout params, or Hugo Module metadata;
+- do not migrate legacy `_default`/`partials` structure just to satisfy new-theme conventions;
+- `exampleSite` is useful but not mandatory when the port's established package style omits it. In that case, document a minimal build command or provide a separate demo site when requested.
+
 For GitHub publication, also prefer:
 
 - clean `.gitignore` excluding `.DS_Store`, Python caches, Hugo build output, `exampleSite/public/`, `.hugo_build.lock`, and generated resource caches;
@@ -86,6 +94,7 @@ exampleSite/
 Use content-type templates (`layouts/posts/list.html`, `layouts/portfolio/single.html`) only when the content model needs them. Keep generic templates in `_default`.
 
 For new theme variants, choose the modern layout when targeting current Hugo. For existing themes, follow the existing convention unless migration is explicitly in scope.
+For ports of known themes, follow the source theme's layout convention unless the user explicitly asks for modernization.
 
 ## Useful Local Examples
 

@@ -18,6 +18,7 @@ Popular guides converge on this sequence:
 
 For this skill, apply that pattern to a new variant by default. Treat direct updates to an old theme as a migration path with compatibility constraints, not as the default action.
 For new variants, `exampleSite` is part of the deliverable, not an optional extra.
+For ports/reimplementations of known themes, preserve upstream package conventions and attribution even when they differ from new-variant defaults.
 
 ## Tutorial-Specific Signals
 
@@ -32,6 +33,7 @@ For new variants, `exampleSite` is part of the deliverable, not an optional extr
 
 - Did the implementation accidentally turn screenshot presentation chrome (browser frame, device mockup, gradient wallpaper) into live site UI?
 - Does the site config actually select the theme, or do docs/commands require `--theme`?
+- If this is a known-theme port, does `theme.toml` include original metadata and does the implementation preserve recognizable upstream params/assets/layout conventions?
 - Does every child template define the blocks expected by the base template?
 - Are partials passed the context they need?
 - Are home, page/single, section/list, taxonomy/term, RSS, 404, and pagination covered when relevant?

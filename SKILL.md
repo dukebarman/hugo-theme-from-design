@@ -9,7 +9,7 @@ description: Create, update, and repair Hugo themes from Figma frames, exported 
 
 Default to generating a new theme variant from the design reference. Update or migrate an existing/old theme only when the user explicitly asks, when the task is framed as a repair, or when the repository clearly has a single theme that must be preserved.
 
-1. Establish the target: new variant, update to an existing theme, migration from an old theme, or repair. Identify the design source (Figma, PNG/JPG screenshot, design tokens, existing site) and the expected Hugo version/content model.
+1. Establish the target: new variant, port/reimplementation of a known theme, update to an existing theme, migration from an old theme, or repair. Identify the design source (Figma, PNG/JPG screenshot, design tokens, existing site) and the expected Hugo version/content model.
 2. Inspect the repository before editing: `hugo version`, `find . -maxdepth 3`, theme `layouts/`, `assets/`, `static/`, `content/`, `data/`, `i18n/`, config files, `theme.toml`, and any `exampleSite`. Detect whether the theme uses the modern Hugo template layout (`layouts/_partials`, root `baseof.html`, `home.html`, `page.html`, `section.html`) or legacy-compatible layout (`layouts/partials`, `layouts/_default/*`).
 3. If creating the default new variant, prefer `hugo new theme <variant-name>` when Hugo is installed. Preserve Hugo's generated skeleton and build on top of it instead of inventing a custom structure.
 4. Separate the actual website UI from presentation context. If a PNG/JPG shows a browser window, device mockup, gradient poster background, drop shadow, or gallery frame around the site, treat those as preview/presentation chrome unless the user explicitly asks to make them part of the live theme.
@@ -41,6 +41,8 @@ When updating an existing theme, keep its public configuration and content conve
 ## New Variant Vs Update
 
 For a new design request, create a new variant rather than overwriting the old theme. Choose a clear variant name from the design direction or user-provided name, scaffold or copy only the minimum reusable pieces needed, and keep the original theme intact for comparison and rollback.
+
+If the design is clearly a known theme or port target, such as Hyde, Poole, PaperMod, or another named theme, treat it as a port/reimplementation task rather than a pure new-variant task. Preserve the recognizable architecture and public configuration where it matters: original metadata in `theme.toml`, README/license attribution, established CSS/module split, theme params, 404/RSS/code/print styles, and compatibility conventions. Do not force `exampleSite` if the target package style intentionally omits it, but provide a buildable demo site when the user asks for a generated variant.
 
 For an update/migration from an old theme:
 - audit current layouts, params, content types, menus, taxonomies, shortcodes, i18n, assets, and public configuration before editing;
@@ -117,9 +119,10 @@ Run the bundled checker from the skill directory:
 python3 scripts/hugo_theme_check.py --theme-dir /path/to/theme
 python3 scripts/hugo_theme_check.py --theme-dir /path/to/theme --site-dir /path/to/site
 python3 scripts/hugo_theme_check.py --theme-dir /path/to/theme --publication
+python3 scripts/hugo_theme_check.py --theme-dir /path/to/theme --mode port --publication
 ```
 
-The checker emits JSON with `errors`, `warnings`, `info`, and an overall `ok` flag. Use it for fast structural validation; add `--publication` when preparing a GitHub/public theme package. Still run Hugo itself and inspect the rendered site for visual quality.
+The checker emits JSON with `errors`, `warnings`, `info`, and an overall `ok` flag. Use default `--mode new` for generated variants with `exampleSite`; use `--mode port` for known-theme ports where compatibility, attribution, README/license, and original structure matter more than Hugo's generated skeleton. Add `--publication` when preparing a GitHub/public theme package. Still run Hugo itself and inspect the rendered site for visual quality.
 
 ## Completion Criteria
 

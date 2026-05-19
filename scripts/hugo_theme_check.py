@@ -20,6 +20,7 @@ except ModuleNotFoundError:  # pragma: no cover - Python < 3.11 fallback
 
 
 REQUIRED_DIRS = ["archetypes", "assets", "content", "data", "i18n", "layouts", "static"]
+PORT_REQUIRED_DIRS = ["archetypes", "assets", "layouts", "static"]
 THEMES_SITE_REQUIRED_META = ["name", "license", "licenselink", "description", "homepage"]
 BUILD_ARTIFACTS = ["public", ".hugo_build.lock", "resources/_gen"]
 README_FILES = ["README.md", "README.markdown", "README"]
@@ -145,6 +146,7 @@ def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--theme-dir", required=True, type=Path, help="Path to the Hugo theme directory")
     parser.add_argument("--site-dir", type=Path, help="Optional Hugo site directory for smoke build")
+    parser.add_argument("--mode", choices=("new", "port"), default="new", help="Validation profile: new generated theme variant or known-theme port")
     parser.add_argument("--skip-build", action="store_true", help="Skip the Hugo smoke build")
     parser.add_argument("--publication", action="store_true", help="Run additional GitHub/themes.gohugo.io package checks")
     parser.add_argument("--timeout", type=int, default=60, help="Hugo command timeout in seconds")
@@ -167,7 +169,8 @@ def main() -> int:
     if not theme_dir.exists() or not theme_dir.is_dir():
         add(result, "errors", "Theme directory does not exist", theme_dir)
     else:
-        for directory in REQUIRED_DIRS:
+        required_dirs = PORT_REQUIRED_DIRS if args.mode == "port" else REQUIRED_DIRS
+        for directory in required_dirs:
             path = theme_dir / directory
             if not path.exists():
                 add(result, "warnings", f"Missing generated skeleton directory: {directory}/", path)
@@ -194,6 +197,8 @@ def main() -> int:
             hugo_version = module.get("hugoVersion", {}) if isinstance(module, dict) else {}
             if not hugo_version and not metadata.get("min_version"):
                 add(result, "warnings", "No Hugo compatibility metadata found in theme.toml", theme_toml)
+            if args.mode == "port" and not metadata.get("original"):
+                add(result, "warnings", "Port mode: theme.toml should include [original] metadata for known-theme ports", theme_toml)
 
         if not any((theme_dir / name).exists() for name in ("hugo.toml", "config.toml", "config.yaml", "config.json")):
             add(result, "warnings", "No root Hugo config file found in theme directory")
@@ -223,7 +228,10 @@ def main() -> int:
 
         example_site = theme_dir / "exampleSite"
         if not example_site.exists():
-            add(result, "warnings", "Missing exampleSite/; new theme variants should include a design-matching demo site", example_site)
+            if args.mode == "new":
+                add(result, "warnings", "Missing exampleSite/; new theme variants should include a design-matching demo site", example_site)
+            else:
+                add(result, "info", "No exampleSite found; acceptable for port mode when package docs provide build/demo guidance", example_site)
         else:
             for artifact in BUILD_ARTIFACTS:
                 artifact_path = example_site / artifact
