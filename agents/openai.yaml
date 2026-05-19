@@ -1,0 +1,4 @@
+interface:
+  display_name: "Hugo Theme From Design"
+  short_description: "Build Hugo themes from designs"
+  default_prompt: "Use $hugo-theme-from-design to create, update, or fix a Hugo theme from a Figma frame, PNG screenshot, or existing theme, including a design-matching exampleSite."

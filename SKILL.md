@@ -1,0 +1,119 @@
+---
+name: hugo-theme-from-design
+description: Create, update, and repair Hugo themes from Figma frames, exported design assets, PNG/JPG screenshots, or existing Hugo theme repositories. Use when Codex needs to turn a website design into a Hugo theme, match a Hugo theme to a visual reference, fix Hugo layout/assets issues, scaffold with `hugo new theme`, validate theme metadata, or improve theme UX/UI against a design brief.
+---
+
+# Hugo Theme From Design
+
+## Workflow
+
+Default to generating a new theme variant from the design reference. Update or migrate an existing/old theme only when the user explicitly asks, when the task is framed as a repair, or when the repository clearly has a single theme that must be preserved.
+
+1. Establish the target: new variant, update to an existing theme, migration from an old theme, or repair. Identify the design source (Figma, PNG/JPG screenshot, design tokens, existing site) and the expected Hugo version/content model.
+2. Inspect the repository before editing: `hugo version`, `find . -maxdepth 3`, theme `layouts/`, `assets/`, `static/`, `content/`, `data/`, `i18n/`, config files, `theme.toml`, and any `exampleSite`. Detect whether the theme uses the modern Hugo template layout (`layouts/_partials`, root `baseof.html`, `home.html`, `page.html`, `section.html`) or legacy-compatible layout (`layouts/partials`, `layouts/_default/*`).
+3. If creating the default new variant, prefer `hugo new theme <variant-name>` when Hugo is installed. Preserve Hugo's generated skeleton and build on top of it instead of inventing a custom structure.
+4. Translate the design into Hugo boundaries:
+   - templates in `layouts/`, with a base template, page/list or page/section/home templates, and reusable partials;
+   - CSS/Sass/JS/images in `assets/` when they should go through Hugo Pipes, or `static/` when copied as-is;
+   - design-matching demo content and config in `exampleSite/`;
+   - theme parameters in config instead of hard-coded copy when users should customize them.
+5. Generate `exampleSite` for new variants by default. Its pages, sections, menus, params, sample images, and front matter should demonstrate the received design, not generic placeholder content. Move or remove the sample Markdown created by `hugo new theme` in the theme root `content/`; root `content/` can stay as an empty skeleton directory, but demo pages belong in `exampleSite/content/`.
+6. Implement visually first, then wire content behavior. Match spacing, hierarchy, color, typography, breakpoints, navigation, cards, media treatment, and states from the design reference before adding optional features.
+7. Validate with `scripts/hugo_theme_check.py` and a real Hugo build/server. Fix template errors, broken assets, missing metadata, responsive regressions, and obvious UX issues before finishing.
+
+## Design Intake
+
+For Figma sources, use available Figma exports or MCP/API data when the environment provides them. Extract frame dimensions, spacing, colors, typography, component variants, image assets, and interaction states. If direct Figma access is unavailable, ask for exported PNG/JPG plus any fonts/assets that are not already in the repo.
+
+For PNG/JPG-only sources, infer layout deliberately:
+- measure the viewport and major regions before coding;
+- identify repeated components and convert them to partials;
+- preserve information hierarchy over pixel-perfect trivia;
+- avoid using a screenshot as the UI background except for explicit mockups.
+
+When updating an existing theme, keep its public configuration and content conventions stable unless the user asks for a breaking redesign.
+
+## New Variant Vs Update
+
+For a new design request, create a new variant rather than overwriting the old theme. Choose a clear variant name from the design direction or user-provided name, scaffold or copy only the minimum reusable pieces needed, and keep the original theme intact for comparison and rollback.
+
+For an update/migration from an old theme:
+- audit current layouts, params, content types, menus, taxonomies, shortcodes, i18n, assets, and public configuration before editing;
+- preserve existing URLs, front matter contracts, params, and documented customization points unless the user approves a breaking change;
+- migrate template conventions only when needed for the requested update or current Hugo compatibility;
+- update or add `exampleSite` so it demonstrates the migrated design and catches compatibility regressions;
+- keep old-to-new mapping notes in the final answer so users know what changed.
+
+## ExampleSite Generation
+
+For every new theme variant, create `exampleSite/` inside the theme. Model the structure after mature themes such as `example_themes/nomad-tech/exampleSite`, but tailor content to the received design.
+
+The minimum useful `exampleSite` includes:
+- `exampleSite/hugo.toml` with `baseURL`, `languageCode`, `title`, `theme = "<theme-folder-name>"`, menus, taxonomies, and `[params]` values needed by the design;
+- `exampleSite/content/_index.md` for homepage content/front matter;
+- section content matching the design, such as `posts/`, `portfolio/`, `about/`, `services/`, `projects/`, `docs/`, or `contact/`;
+- enough sample Markdown to exercise home, section/list, page/single, taxonomy/term, pagination, media cards, navigation, footer, and empty/long text states;
+- sample front matter for design-specific fields such as hero images, eyebrow text, CTAs, featured flags, authors, tags, dates, summaries, external links, and gallery assets.
+
+Keep generated demo content credible but lightweight. Do not put built output such as `public/` or `.hugo_build.lock` into the theme unless the user explicitly wants generated artifacts.
+
+## Hugo Implementation Rules
+
+Read `references/hugo-theme-notes.md` when the task involves scaffolding, theme-store readiness, metadata, or unfamiliar Hugo structure.
+Read `references/hugo-theme-guide-findings.md` when validating the workflow against common third-party tutorials or when the user asks for a tutorial-style theme implementation.
+
+Prefer the repo's current Hugo style:
+- Go templates and partial naming already present in the theme;
+- Hugo Pipes patterns already used in `assets/`;
+- existing parameter names, menu conventions, taxonomy structure, and i18n keys;
+- minimal dependencies unless the theme already uses npm/Vite/PostCSS/Sass.
+
+For Hugo `v0.146+`, prefer the modern template layout for new work unless the repository clearly uses legacy conventions. For existing themes, do not migrate `_default` to root templates or `partials` to `_partials` as an incidental change; only migrate when the user asks or Hugo build errors require it.
+
+Ensure child templates define the same blocks used by the base template, typically `{{ define "main" }}`. When calling partials that need page/site data, pass context explicitly with `.` or a focused `dict`.
+
+Do not delete user layouts, params, content, translations, or generated visual assets just because they are outside the current design. Work around them or preserve compatibility.
+
+Use these commands as the baseline:
+
+```bash
+hugo version
+hugo new theme <theme-name>
+hugo --source <site-or-exampleSite> --theme <theme-name> --destination /tmp/<theme-name>-public --noBuildLock
+hugo server --source <site-or-exampleSite> --theme <theme-name> --disableFastRender --renderToMemory --noBuildLock
+```
+
+For standalone theme repositories, build the included `exampleSite` when present. For new variants, create `exampleSite` before final validation. For old themes without `exampleSite`, either add one as part of the migration/update or clearly report why it was out of scope.
+
+After running Hugo commands, check that `exampleSite/public/` and `exampleSite/.hugo_build.lock` were not left in the deliverable. Remove these build artifacts before finalizing unless the user explicitly asked to keep generated output.
+
+When delivering a full site plus theme, set the theme in site config (`theme = "<theme-name>"` or the equivalent YAML/JSON) unless the project intentionally uses `--theme` or Hugo Modules.
+
+## UX/UI Review
+
+Read `references/ux-ui-checklist.md` before final visual verification. Treat it as an embedded lightweight frontend-design review:
+- first match the design reference;
+- then check responsive behavior, accessibility, interaction states, content density, and Hugo-specific authoring ergonomics;
+- do not add marketing copy or feature explanations unless the design calls for them.
+
+Use browser screenshots when a local server can run. Check desktop and mobile widths. Fix text overflow, overlapping UI, broken image crops, illegible contrast, and navigation states.
+
+## Validation Script
+
+Run the bundled checker from the skill directory:
+
+```bash
+python3 scripts/hugo_theme_check.py --theme-dir /path/to/theme
+python3 scripts/hugo_theme_check.py --theme-dir /path/to/theme --site-dir /path/to/site
+```
+
+The checker emits JSON with `errors`, `warnings`, `info`, and an overall `ok` flag. Use it for fast structural validation; still run Hugo itself and inspect the rendered site for visual quality.
+
+## Completion Criteria
+
+Finish only after:
+- Hugo is installed or the user is told exactly that validation was blocked by missing Hugo;
+- the changed theme builds, or remaining build failures are documented with file paths and errors;
+- the design reference has been translated into maintainable Hugo templates/assets;
+- theme metadata and preview-image requirements are satisfied when publication to `themes.gohugo.io` is in scope;
+- UX/UI issues found during visual review are fixed or explicitly called out.
