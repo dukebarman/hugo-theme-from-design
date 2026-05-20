@@ -29,6 +29,8 @@ For ports/reimplementations of known themes:
 - preserve `[original]` metadata in `theme.toml` with author/homepage/repo when the source theme is not original work;
 - keep license and attribution aligned with the upstream theme;
 - prefer the upstream package architecture when recognizable, such as Poole/Hyde split CSS, print/syntax CSS, theme color classes, reverse-layout params, or Hugo Module metadata;
+- preserve public configuration names, widget order/options, content section names, taxonomy names, extension partials, shortcodes, and documented build tooling when users expect compatibility;
+- distinguish source dependencies from runtime dependencies: a theme may require Tailwind/npm/Pagefind for development or indexing while still rendering as static output after build;
 - do not migrate legacy `_default`/`partials` structure just to satisfy new-theme conventions;
 - `exampleSite` is useful but not mandatory when the port's established package style omits it. In that case, document a minimal build command or provide a separate demo site when requested.
 
@@ -57,6 +59,13 @@ A design-matching prototype can be intentionally small. A publishable theme shou
 - advertised features in `theme.toml`, README, or visible UI should be implemented and tested.
 
 Keep optional advanced features scoped. Do not add a Tailwind/npm pipeline, search engine, comments, PWA, or multilingual system only because a comparison theme has one; add them when the design, target audience, or publishing goal benefits from the extra surface.
+
+When comparing a generated theme to a human-made original, score both visual match and public API match. A generated theme can pass visual checks while still failing compatibility if it omits documented params, widget architecture, extension partials, build tooling, or integrations that users rely on.
+
+If the request is ambiguous, ask the user to choose between:
+
+- visual variant: match the look and produce a clean new theme with sensible Hugo behavior;
+- compatible port: preserve original params, widgets, content conventions, extension points, dependencies, and documented integrations.
 
 ## Common Hugo Theme Layouts
 
