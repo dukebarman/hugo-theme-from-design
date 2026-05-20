@@ -134,6 +134,12 @@ Read `references/ux-ui-checklist.md` before final visual verification. Treat it 
 
 Use browser screenshots when a local server can run. Prefer whatever headless browser is available in the environment, such as Playwright, Chromium/Chrome, Firefox, WebKit, or another browser already installed by the project. Check desktop and mobile widths. If Firefox on macOS is used while a regular Firefox session is open, run it with a temporary profile, for example `firefox --headless --profile /tmp/<profile> --screenshot /tmp/<theme>.png --window-size 1440,1000 <url>`. If no browser screenshot tool is available, report that visual verification was limited to Hugo build, rendered HTML, and CSS/DOM inspection. Fix text overflow, overlapping UI, broken image crops, illegible contrast, broken controls, and navigation states.
 
+When a local server is running and Firefox, Chrome, or Chromium is available, use the bundled screenshot helper to generate theme-store preview images from the rendered theme instead of drawing placeholder previews:
+
+```bash
+python3 scripts/render_theme_preview.py --url http://127.0.0.1:1313/ --theme-dir /path/to/theme
+```
+
 ## Validation Script
 
 Run the bundled checker from the skill directory:
@@ -146,6 +152,12 @@ python3 scripts/hugo_theme_check.py --theme-dir /path/to/theme --mode port --pub
 ```
 
 The checker emits JSON with `errors`, `warnings`, `info`, and an overall `ok` flag. Use default `--mode new` for generated variants with `exampleSite`; use `--mode port` for known-theme ports where compatibility, attribution, README/license, and original structure matter more than Hugo's generated skeleton. Add `--publication` when preparing a GitHub/public theme package. Still run Hugo itself and inspect the rendered site for visual quality.
+
+For skill development, run the bundled unit tests after changing scripts:
+
+```bash
+python3 -m unittest discover -s tests
+```
 
 ## Completion Criteria
 
