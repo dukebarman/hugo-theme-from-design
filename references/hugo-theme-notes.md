@@ -62,7 +62,7 @@ Keep optional advanced features scoped. Do not add a Tailwind/npm pipeline, sear
 
 When comparing a generated theme to a human-made original, score both visual match and public API match. A generated theme can pass visual checks while still failing compatibility if it omits documented params, widget architecture, extension partials, build tooling, or integrations that users rely on.
 
-If the request is ambiguous, ask the user to choose between:
+If the user supplied known themes as examples, use them as a quality reference corpus and generate the most useful working theme for the new design. If a specific existing theme is the target and the request is ambiguous, ask the user to choose between:
 
 - visual variant: match the look and produce a clean new theme with sensible Hugo behavior;
 - compatible port: preserve original params, widgets, content conventions, extension points, dependencies, and documented integrations.
