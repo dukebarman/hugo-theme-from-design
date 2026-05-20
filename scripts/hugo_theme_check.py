@@ -23,11 +23,15 @@ REQUIRED_DIRS = ["archetypes", "assets", "content", "data", "i18n", "layouts", "
 PORT_REQUIRED_DIRS = ["archetypes", "assets", "layouts", "static"]
 THEMES_SITE_REQUIRED_META = ["name", "license", "licenselink", "description", "homepage"]
 BUILD_ARTIFACTS = ["public", ".hugo_build.lock", "resources"]
-CONFIG_FILES = ("hugo.toml", "config.toml", "config.yaml", "config.json")
+CONFIG_FILES = ("hugo.toml", "hugo.yaml", "hugo.yml", "hugo.json", "config.toml", "config.yaml", "config.yml", "config.json")
 CONFIG_DIR_FILES = (
     "config/_default/hugo.toml",
+    "config/_default/hugo.yaml",
+    "config/_default/hugo.yml",
+    "config/_default/hugo.json",
     "config/_default/config.toml",
     "config/_default/config.yaml",
+    "config/_default/config.yml",
     "config/_default/config.json",
 )
 README_FILES = ["README.md", "README.markdown", "README"]
@@ -226,6 +230,10 @@ def main() -> int:
             add(result, "warnings", "No root Hugo config file found in theme directory")
 
         if args.publication:
+            for artifact in BUILD_ARTIFACTS:
+                artifact_path = theme_dir / artifact
+                if artifact_path.exists():
+                    add(result, "warnings", f"Build artifact should not be committed in theme root: {artifact}", artifact_path)
             if not any_exists(theme_dir, README_FILES):
                 add(result, "warnings", "Publication check: missing README.md")
             if not any_exists(theme_dir, LICENSE_FILES):

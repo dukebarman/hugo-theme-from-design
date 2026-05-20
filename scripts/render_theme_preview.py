@@ -93,14 +93,24 @@ def browser_command(browser: str, executable: Path, url: str, output: Path, size
 
 
 def run_capture(command: list[str], timeout: int) -> tuple[int, str]:
-    completed = subprocess.run(
-        command,
-        text=True,
-        stdout=subprocess.PIPE,
-        stderr=subprocess.STDOUT,
-        timeout=timeout,
-        check=False,
-    )
+    try:
+        completed = subprocess.run(
+            command,
+            text=True,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.STDOUT,
+            timeout=timeout,
+            check=False,
+        )
+    except subprocess.TimeoutExpired as exc:
+        output = exc.stdout or exc.stderr or ""
+        if isinstance(output, bytes):
+            output = output.decode(errors="replace")
+        detail = output.strip()
+        message = f"Browser command timed out after {timeout}s"
+        return 124, f"{message}: {detail}" if detail else message
+    except OSError as exc:
+        return 127, f"Unable to run browser command: {exc}"
     return completed.returncode, completed.stdout.strip()
 
 
@@ -128,6 +138,12 @@ def main() -> int:
     theme_dir = args.theme_dir.resolve()
     result = {"ok": True, "theme_dir": str(theme_dir), "errors": [], "warnings": [], "info": [], "files": []}
 
+    if not theme_dir.exists() or not theme_dir.is_dir():
+        add(result, "errors", "Theme directory does not exist", theme_dir)
+        result["ok"] = False
+        print(json.dumps(result, indent=2, ensure_ascii=False))
+        return 1
+
     browser = detect_browser(args.browser)
     if browser is None:
         add(result, "errors", "No supported headless browser found. Install Firefox, Chrome, or Chromium, or pass --browser explicitly.")
@@ -137,7 +153,13 @@ def main() -> int:
 
     browser_name, executable = browser
     images_dir = theme_dir / "images"
-    images_dir.mkdir(parents=True, exist_ok=True)
+    try:
+        images_dir.mkdir(parents=True, exist_ok=True)
+    except OSError as exc:
+        add(result, "errors", f"Unable to create images directory: {exc}", images_dir)
+        result["ok"] = False
+        print(json.dumps(result, indent=2, ensure_ascii=False))
+        return 1
     add(result, "info", f"Using {browser_name}: {executable}")
 
     targets = [

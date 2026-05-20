@@ -1,11 +1,16 @@
 from __future__ import annotations
 
+import contextlib
 import importlib.util
+import io
+import json
 import struct
+import sys
 import tempfile
 import unittest
 import zlib
 from pathlib import Path
+from unittest import mock
 
 
 SCRIPT = Path(__file__).resolve().parents[1] / "scripts" / "hugo_theme_check.py"
@@ -31,11 +36,18 @@ def write_png(path: Path, width: int, height: int) -> None:
 
 
 class HugoThemeCheckTests(unittest.TestCase):
-    def test_has_hugo_config_detects_config_default_hugo_toml(self) -> None:
+    def test_has_hugo_config_detects_config_default_hugo_yaml(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             base = Path(tmp)
             (base / "config" / "_default").mkdir(parents=True)
-            (base / "config" / "_default" / "hugo.toml").write_text("title = 'Demo'\n", encoding="utf-8")
+            (base / "config" / "_default" / "hugo.yaml").write_text("title: Demo\n", encoding="utf-8")
+
+            self.assertTrue(hugo_theme_check.has_hugo_config(base))
+
+    def test_has_hugo_config_detects_root_hugo_json(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            base = Path(tmp)
+            (base / "hugo.json").write_text('{"title":"Demo"}\n', encoding="utf-8")
 
             self.assertTrue(hugo_theme_check.has_hugo_config(base))
 
@@ -101,6 +113,42 @@ class HugoThemeCheckTests(unittest.TestCase):
 
             self.assertEqual(cwd, site)
             self.assertEqual(command, ["hugo", "--theme", "demo"])
+
+    def test_publication_warns_about_theme_root_build_artifacts(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            theme = Path(tmp)
+            for directory in ("archetypes", "assets", "content", "data", "i18n", "layouts", "static", "public"):
+                (theme / directory).mkdir(parents=True)
+            (theme / "layouts" / "_partials").mkdir()
+            (theme / "layouts" / "home.html").write_text("{{ define \"main\" }}{{ end }}\n", encoding="utf-8")
+            (theme / "hugo.yaml").write_text("title: Demo\n", encoding="utf-8")
+            (theme / "theme.toml").write_text(
+                "\n".join(
+                    [
+                        "name = 'Demo'",
+                        "license = 'MIT'",
+                        "licenselink = 'https://example.org/license'",
+                        "description = 'Demo theme'",
+                        "homepage = 'https://example.org/'",
+                        "min_version = '0.146.0'",
+                    ]
+                ),
+                encoding="utf-8",
+            )
+            argv = ["hugo_theme_check.py", "--theme-dir", str(theme), "--publication", "--skip-build"]
+            buffer = io.StringIO()
+
+            with (
+                mock.patch.object(sys, "argv", argv),
+                mock.patch.object(hugo_theme_check.shutil, "which", return_value="/usr/bin/hugo"),
+                mock.patch.object(hugo_theme_check, "run_command", return_value=(0, "hugo v0.161.1")),
+                contextlib.redirect_stdout(buffer),
+            ):
+                code = hugo_theme_check.main()
+
+        payload = json.loads(buffer.getvalue())
+        self.assertEqual(code, 0)
+        self.assertTrue(any("theme root: public" in warning["message"] for warning in payload["warnings"]))
 
 
 if __name__ == "__main__":
