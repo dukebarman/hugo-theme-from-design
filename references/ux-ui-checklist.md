@@ -13,6 +13,7 @@ Use this as a lightweight embedded frontend-design review when translating a Fig
 - Use real design assets when available. Do not hide weak asset handling behind dark overlays, blur, or generic gradients.
 - If a reference shows light and dark theme states side by side, verify the generated page supports both states as modes instead of freezing the screenshot's split view into the live layout.
 - Check generated demo assets against the reference for missing or clipped details; sample logos, badges, icons, and screenshots should not silently drop letters or visual elements.
+- For publishable themes, preview images should come from the rendered site when a browser screenshot tool is available; schematic placeholders are acceptable only for early prototypes.
 
 ## Responsive Behavior
 
@@ -22,6 +23,7 @@ Use this as a lightweight embedded frontend-design review when translating a Fig
 - Define stable dimensions for repeated cards, image containers, icon buttons, and toolbars.
 - Do not let hover/focus/loading states resize layouts.
 - Keep primary content before secondary navigation/filter sidebars on narrow blog, docs, and list pages unless the design explicitly prioritizes filtering first.
+- Ensure visible list controls match real behavior: pagination should use Hugo pagination, search boxes should route to a search page or be removed, and language/menu toggles should open actual UI.
 
 ## Accessibility
 
@@ -30,6 +32,7 @@ Use this as a lightweight embedded frontend-design review when translating a Fig
 - Add useful alt text for content images and empty alt for decorative images.
 - Ensure keyboard focus is visible on links, buttons, menus, search, toggles, and pagination.
 - Verify interactive controls actually bind in the rendered browser when scripts are emitted from `<head>`; theme toggles and menus should work after initial page load.
+- Prefer real SVG/icon assets or an icon partial for reusable controls; text glyphs are acceptable only when they are intentional content, not stand-ins for UI icons.
 - Respect reduced motion when adding transitions or animations.
 
 ## Content And Authoring

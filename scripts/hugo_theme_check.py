@@ -22,9 +22,18 @@ except ModuleNotFoundError:  # pragma: no cover - Python < 3.11 fallback
 REQUIRED_DIRS = ["archetypes", "assets", "content", "data", "i18n", "layouts", "static"]
 PORT_REQUIRED_DIRS = ["archetypes", "assets", "layouts", "static"]
 THEMES_SITE_REQUIRED_META = ["name", "license", "licenselink", "description", "homepage"]
-BUILD_ARTIFACTS = ["public", ".hugo_build.lock", "resources/_gen"]
+BUILD_ARTIFACTS = ["public", ".hugo_build.lock", "resources"]
+CONFIG_FILES = ("hugo.toml", "config.toml", "config.yaml", "config.json")
+CONFIG_DIR_FILES = (
+    "config/_default/hugo.toml",
+    "config/_default/config.toml",
+    "config/_default/config.yaml",
+    "config/_default/config.json",
+)
 README_FILES = ["README.md", "README.markdown", "README"]
 LICENSE_FILES = ["LICENSE", "LICENSE.md", "COPYING"]
+ROOT_SUPPORT_CONTENT_DIRS = {"search"}
+ROOT_SUPPORT_CONTENT_FILES = {"manifest.md"}
 FAVICON_CANDIDATES = [
     "static/favicon.ico",
     "static/favicon.svg",
@@ -130,6 +139,19 @@ def any_exists(base: Path, candidates: list[str]) -> bool:
     return any((base / candidate).exists() for candidate in candidates)
 
 
+def has_hugo_config(base: Path) -> bool:
+    return any((base / name).exists() for name in CONFIG_FILES + CONFIG_DIR_FILES)
+
+
+def classify_root_content(path: Path, root_content: Path) -> str:
+    relative = path.relative_to(root_content)
+    if relative.name in ROOT_SUPPORT_CONTENT_FILES:
+        return "support"
+    if relative.parts and relative.parts[0] in ROOT_SUPPORT_CONTENT_DIRS:
+        return "support"
+    return "sample"
+
+
 def detect_build_command(theme_dir: Path, site_dir: Path | None) -> tuple[Path, list[str]] | None:
     theme_name = theme_dir.name
     if site_dir is not None:
@@ -200,7 +222,7 @@ def main() -> int:
             if args.mode == "port" and not metadata.get("original"):
                 add(result, "warnings", "Port mode: theme.toml should include [original] metadata for known-theme ports", theme_toml)
 
-        if not any((theme_dir / name).exists() for name in ("hugo.toml", "config.toml", "config.yaml", "config.json")):
+        if not has_hugo_config(theme_dir):
             add(result, "warnings", "No root Hugo config file found in theme directory")
 
         if args.publication:
@@ -219,12 +241,16 @@ def main() -> int:
         if root_content.exists():
             root_markdown = list(root_content.rglob("*.md"))
             if root_markdown:
-                add(
-                    result,
-                    "warnings",
-                    f"Theme root content contains {len(root_markdown)} Markdown file(s); for new variants, keep demo content in exampleSite/content to avoid sample-content leakage",
-                    root_content,
-                )
+                sample_markdown = [path for path in root_markdown if classify_root_content(path, root_content) == "sample"]
+                if sample_markdown:
+                    add(
+                        result,
+                        "warnings",
+                        f"Theme root content contains {len(sample_markdown)} sample Markdown file(s); for new variants, keep demo content in exampleSite/content to avoid sample-content leakage",
+                        root_content,
+                    )
+                else:
+                    add(result, "info", f"Theme root content contains {len(root_markdown)} support Markdown file(s)", root_content)
 
         example_site = theme_dir / "exampleSite"
         if not example_site.exists():
@@ -237,7 +263,7 @@ def main() -> int:
                 artifact_path = example_site / artifact
                 if artifact_path.exists():
                     add(result, "warnings", f"Build artifact should not be committed in exampleSite: {artifact}", artifact_path)
-            if not any((example_site / name).exists() for name in ("hugo.toml", "config.toml", "config.yaml", "config.json")):
+            if not has_hugo_config(example_site):
                 add(result, "warnings", "exampleSite is missing a Hugo config file", example_site)
             if not (example_site / "content").exists():
                 add(result, "warnings", "exampleSite is missing content/", example_site / "content")

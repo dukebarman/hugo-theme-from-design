@@ -44,6 +44,20 @@ For GitHub publication, also prefer:
 - code highlighting styles when sample posts include code;
 - documented params such as `mainSections`, `dateFormat`, `defaultColor`, author/avatar/social fields, footer, and optional analytics/comments.
 
+## Prototype Vs Product
+
+A design-matching prototype can be intentionally small. A publishable theme should behave like a reusable product:
+
+- controls visible in the UI should work, including search, color mode, mobile menu, language switcher, filters, copy buttons, and pagination;
+- list pages should use `.Paginate` or a documented limit when content can grow;
+- icons should come from reusable SVG assets/partials or a project icon system, not ad hoc text glyphs;
+- article images should support missing images, alt text, page resources, and reasonable resizing or aspect-ratio handling;
+- generated `images/screenshot.png` and `images/tn.png` should be rendered previews of the theme where possible, not schematic approximations;
+- `exampleSite` should demonstrate real authoring contracts: front matter fields, taxonomies, long/short content, image/no-image cards, code blocks, and single pages;
+- advertised features in `theme.toml`, README, or visible UI should be implemented and tested.
+
+Keep optional advanced features scoped. Do not add a Tailwind/npm pipeline, search engine, comments, PWA, or multilingual system only because a comparison theme has one; add them when the design, target audience, or publishing goal benefits from the extra surface.
+
 ## Common Hugo Theme Layouts
 
 Modern Hugo template layout:
@@ -85,9 +99,9 @@ images/
   screenshot.png
   tn.png
 theme.toml
-hugo.toml or config.toml
+hugo.toml, config.toml, or config/_default/*.toml
 exampleSite/
-  hugo.toml
+  hugo.toml or config/_default/*.toml
   content/
 ```
 

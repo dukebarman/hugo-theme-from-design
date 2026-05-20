@@ -70,6 +70,14 @@ Keep generated demo content credible but lightweight. Do not put built output su
 
 For quick design tests, keep the theme focused and small. For a publishable GitHub theme or a theme intended for `themes.gohugo.io`, read the production checklist in `references/hugo-theme-notes.md` and add the expected package surface: README, license, richer `exampleSite`, favicon/webmanifest assets, 404/RSS/templates, responsive mobile navigation, code styles when posts include code, and documented params.
 
+Do not confuse a visually plausible prototype with a reusable theme product. When the user compares against a mature human-made theme or plans to publish the result, graduate the implementation beyond screenshot matching:
+- replace decorative or placeholder UI with working Hugo behavior, or remove controls that are only visual;
+- implement pagination with Hugo pagination APIs when lists can exceed one page;
+- use real icon assets or an icon partial instead of unicode stand-ins for reusable theme UI;
+- make post images robust with page resources/static assets and resizing where practical;
+- add search, comments, PWA, i18n, analytics, or shortcodes only when requested or implied, but make advertised features actually work;
+- generate preview screenshots from the rendered theme when a browser screenshot tool is available instead of drawing schematic placeholder previews.
+
 ## Hugo Implementation Rules
 
 Read `references/hugo-theme-notes.md` when the task involves scaffolding, theme-store readiness, metadata, or unfamiliar Hugo structure.
@@ -78,6 +86,7 @@ Read `references/hugo-theme-guide-findings.md` when validating the workflow agai
 Prefer the repo's current Hugo style:
 - Go templates and partial naming already present in the theme;
 - Hugo Pipes patterns already used in `assets/`;
+- config style already present, including `hugo.toml`, `config.toml`, or `config/_default/*.toml`;
 - existing parameter names, menu conventions, taxonomy structure, and i18n keys;
 - minimal dependencies unless the theme already uses npm/Vite/PostCSS/Sass.
 
