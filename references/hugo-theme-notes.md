@@ -176,19 +176,20 @@ Do not commit `exampleSite/public/` or `.hugo_build.lock` by default. They are b
 ## Build Strategy
 
 1. Run `hugo version`.
-2. If the theme has `exampleSite`, build it with the theme:
+2. When scaffolding a new theme, run `hugo new theme <name>` from the site/repository root where the `themes/` directory should be created. Immediately verify the resulting path, especially if the current directory is already named `themes`, to avoid accidentally creating `themes/themes/<name>`.
+3. If the theme has `exampleSite`, build it with the theme:
 
 ```bash
 hugo --source exampleSite --themesDir .. --theme <theme-folder-name> --destination /tmp/<theme-folder-name>-public --noBuildLock
 ```
 
-3. If working inside a full Hugo site with `themes/<theme>`, build from the site root:
+4. If working inside a full Hugo site with `themes/<theme>`, build from the site root:
 
 ```bash
 hugo --theme <theme-folder-name>
 ```
 
-4. For visual review, run:
+5. For visual review, run:
 
 ```bash
 hugo server --source exampleSite --themesDir .. --theme <theme-folder-name> --disableFastRender --renderToMemory --noBuildLock

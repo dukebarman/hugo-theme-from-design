@@ -14,6 +14,7 @@ Use this as a lightweight embedded frontend-design review when translating a Fig
 - If a reference shows light and dark theme states side by side, verify the generated page supports both states as modes instead of freezing the screenshot's split view into the live layout.
 - Check generated demo assets against the reference for missing or clipped details; sample logos, badges, icons, and screenshots should not silently drop letters or visual elements.
 - For publishable themes, preview images should come from the rendered site when a browser screenshot tool is available; schematic placeholders are acceptable only for early prototypes.
+- When using diagonal masks, overlays, split backgrounds, sticky sidebars, or other decorative layers, define a safe content area so titles, summaries, dates, and controls do not sit under the decoration at desktop or mobile widths.
 
 ## Responsive Behavior
 
@@ -55,6 +56,7 @@ Use this as a lightweight embedded frontend-design review when translating a Fig
 Before finishing, look for:
 
 - overlapping text or controls;
+- content hidden under decorative masks, overlays, or split backgrounds;
 - clipped cards, images, code blocks, tables, and pagination;
 - unreadable nav over hero media;
 - inconsistent icon sizes;
