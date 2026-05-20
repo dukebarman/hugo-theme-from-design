@@ -1,6 +1,7 @@
 ---
 name: hugo-theme-from-design
 description: Create, update, and repair Hugo themes from Figma frames, exported design assets, PNG/JPG screenshots, or existing Hugo theme repositories. Use when Codex needs to turn a website design into a Hugo theme, match a Hugo theme to a visual reference, fix Hugo layout/assets issues, scaffold with `hugo new theme`, validate theme metadata, or improve theme UX/UI against a design brief.
+license: Apache-2.0
 ---
 
 # Hugo Theme From Design
