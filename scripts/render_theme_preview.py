@@ -5,6 +5,7 @@ from __future__ import annotations
 
 import argparse
 from html.parser import HTMLParser
+import ipaddress
 import json
 import re
 import shutil
@@ -33,6 +34,9 @@ BROWSERS = {
         "chromium-browser",
     ],
 }
+MAX_PREVIEW_IMAGE_BYTES = 25 * 1024 * 1024
+MAX_PREVIEW_PIXELS = 12_000_000
+MAX_PREVIEW_REDIRECTS = 5
 
 
 class PreviewURLParser(HTMLParser):
@@ -49,6 +53,11 @@ class PreviewURLParser(HTMLParser):
                 self.meta_refresh = match.group(1).strip(" '\"")
         if tag.lower() == "link" and "canonical" in values.get("rel", "").lower().split():
             self.canonical = values.get("href")
+
+
+class NoRedirectHandler(urllib.request.HTTPRedirectHandler):
+    def redirect_request(self, req, fp, code, msg, headers, newurl):  # type: ignore[no-untyped-def]
+        return None
 
 
 def add(result: dict, level: str, message: str, path: Path | None = None) -> None:
@@ -95,21 +104,62 @@ def same_origin(left: str, right: str) -> bool:
     return (left_url.scheme, left_url.netloc) == (right_url.scheme, right_url.netloc)
 
 
-def resolve_preview_url(url: str, timeout: int) -> tuple[str, list[str], list[str]]:
+def is_local_preview_url(url: str) -> bool:
+    parsed = urllib.parse.urlparse(url)
+    if parsed.scheme not in {"http", "https"} or not parsed.hostname:
+        return False
+    hostname = parsed.hostname.lower()
+    if hostname == "localhost" or hostname.endswith(".localhost"):
+        return True
+    try:
+        return ipaddress.ip_address(hostname).is_loopback
+    except ValueError:
+        return False
+
+
+def validate_preview_url(url: str, allow_remote: bool) -> str | None:
+    parsed = urllib.parse.urlparse(url)
+    if parsed.scheme not in {"http", "https"} or not parsed.netloc:
+        return "Preview URL must be an absolute http:// or https:// URL"
+    if not allow_remote and not is_local_preview_url(url):
+        return "Preview URL must be local by default; pass --allow-remote-url to capture a remote URL intentionally"
+    return None
+
+
+def resolve_preview_url(url: str, timeout: int, allow_remote: bool = False) -> tuple[str, list[str], list[str]]:
     info: list[str] = []
     warnings: list[str] = []
-    request = urllib.request.Request(url, headers={"User-Agent": "hugo-theme-preview/1.0"})
-    try:
-        with urllib.request.urlopen(request, timeout=timeout) as response:
-            resolved_url = response.geturl()
-            content_type = response.headers.get("content-type", "")
-            body = response.read(262144)
-    except (OSError, urllib.error.URLError) as exc:
-        warnings.append(f"Unable to preflight preview URL; using original URL: {exc}")
-        return url, info, warnings
+    opener = urllib.request.build_opener(NoRedirectHandler)
+    resolved_url = url
+    for _ in range(MAX_PREVIEW_REDIRECTS + 1):
+        request = urllib.request.Request(resolved_url, headers={"User-Agent": "hugo-theme-preview/1.0"})
+        try:
+            with opener.open(request, timeout=timeout) as response:
+                content_type = response.headers.get("content-type", "")
+                body = response.read(262144)
+                break
+        except urllib.error.HTTPError as exc:
+            if exc.code not in {301, 302, 303, 307, 308}:
+                warnings.append(f"Unable to preflight preview URL; using {resolved_url}: HTTP {exc.code}")
+                return resolved_url, info, warnings
+            location = exc.headers.get("location")
+            if not location:
+                warnings.append(f"HTTP redirect from preview URL had no Location header; using {resolved_url}")
+                return resolved_url, info, warnings
+            target = urllib.parse.urljoin(resolved_url, location)
+            validation_error = validate_preview_url(target, allow_remote)
+            if validation_error:
+                warnings.append(f"Ignoring unsafe HTTP redirect target {target}: {validation_error}")
+                return resolved_url, info, warnings
+            info.append(f"HTTP redirect resolved preview URL to {target}")
+            resolved_url = target
+        except (OSError, urllib.error.URLError) as exc:
+            warnings.append(f"Unable to preflight preview URL; using {resolved_url}: {exc}")
+            return resolved_url, info, warnings
+    else:
+        warnings.append(f"Preview URL exceeded {MAX_PREVIEW_REDIRECTS} redirects; using {resolved_url}")
+        return resolved_url, info, warnings
 
-    if resolved_url != url:
-        info.append(f"HTTP redirect resolved preview URL to {resolved_url}")
     if "html" not in content_type.lower():
         return resolved_url, info, warnings
 
@@ -122,17 +172,24 @@ def resolve_preview_url(url: str, timeout: int) -> tuple[str, list[str], list[st
 
     if parser.meta_refresh:
         target = urllib.parse.urljoin(resolved_url, parser.meta_refresh)
-        if same_origin(resolved_url, target):
+        validation_error = validate_preview_url(target, allow_remote)
+        if validation_error:
+            warnings.append(f"Ignoring unsafe meta refresh preview URL {target}: {validation_error}")
+        elif same_origin(resolved_url, target):
             info.append(f"Meta refresh resolved preview URL to {target}")
             return target, info, warnings
-        warnings.append(f"Ignoring cross-origin meta refresh preview URL: {target}")
+        else:
+            warnings.append(f"Ignoring cross-origin meta refresh preview URL: {target}")
     if parser.canonical:
         target = urllib.parse.urljoin(resolved_url, parser.canonical)
         source_path = urllib.parse.urlparse(resolved_url).path or "/"
-        if target != resolved_url and same_origin(resolved_url, target) and source_path in {"", "/"}:
+        validation_error = validate_preview_url(target, allow_remote)
+        if validation_error:
+            warnings.append(f"Ignoring unsafe canonical preview URL {target}: {validation_error}")
+        elif target != resolved_url and same_origin(resolved_url, target) and source_path in {"", "/"}:
             info.append(f"Canonical URL resolved root preview URL to {target}")
             return target, info, warnings
-        if target != resolved_url:
+        elif target != resolved_url:
             warnings.append(f"Canonical URL differs from preview URL: {target}")
     return resolved_url, info, warnings
 
@@ -199,6 +256,8 @@ def capture(browser: str, executable: Path, url: str, output: Path, size: tuple[
 
 def png_pixel_sanity(path: Path) -> tuple[bool | None, str]:
     try:
+        if path.stat().st_size > MAX_PREVIEW_IMAGE_BYTES:
+            return False, f"Preview image is too large for pixel sanity check: {path.stat().st_size} bytes"
         data = path.read_bytes()
     except OSError as exc:
         return False, f"Unable to read preview image: {exc}"
@@ -226,13 +285,21 @@ def png_pixel_sanity(path: Path) -> tuple[bool | None, str]:
 
     if width is None or height is None or bit_depth != 8 or color_type not in {2, 6} or interlace != 0:
         return None, "Pixel sanity check skipped for unsupported PNG format"
+    if width <= 0 or height <= 0 or width * height > MAX_PREVIEW_PIXELS:
+        return False, f"Preview image is too large for pixel sanity check: {width}x{height}"
 
     channels = 4 if color_type == 6 else 3
     stride = width * channels
+    expected_raw_size = (stride + 1) * height
     try:
-        raw = zlib.decompress(compressed)
+        decompressor = zlib.decompressobj()
+        raw = decompressor.decompress(compressed, expected_raw_size + 1)
     except zlib.error as exc:
         return False, f"Unable to decompress PNG pixels: {exc}"
+    if len(raw) > expected_raw_size or decompressor.unconsumed_tail:
+        return False, "PNG pixel data exceeds the expected size"
+    if len(raw) != expected_raw_size:
+        return False, "PNG pixel data is incomplete"
 
     rows: list[bytes] = []
     previous = bytearray(stride)
@@ -304,6 +371,7 @@ def main() -> int:
     parser.add_argument("--screenshot-size", type=parse_size, default=(1500, 1000), help="Full screenshot size, default 1500x1000")
     parser.add_argument("--thumbnail-size", type=parse_size, default=(900, 600), help="Thumbnail size, default 900x600")
     parser.add_argument("--timeout", type=int, default=30, help="Browser command timeout in seconds")
+    parser.add_argument("--allow-remote-url", action="store_true", help="Allow capturing a non-local preview URL")
     args = parser.parse_args()
 
     theme_dir = args.theme_dir.resolve()
@@ -333,7 +401,14 @@ def main() -> int:
         return 1
     add(result, "info", f"Using {browser_name}: {executable}")
 
-    preview_url, url_info, url_warnings = resolve_preview_url(args.url, args.timeout)
+    validation_error = validate_preview_url(args.url, args.allow_remote_url)
+    if validation_error:
+        add(result, "errors", validation_error)
+        result["ok"] = False
+        print(json.dumps(result, indent=2, ensure_ascii=False))
+        return 1
+
+    preview_url, url_info, url_warnings = resolve_preview_url(args.url, args.timeout, args.allow_remote_url)
     for message in url_info:
         add(result, "info", message)
     for message in url_warnings:

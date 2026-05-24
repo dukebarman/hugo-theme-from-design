@@ -103,6 +103,20 @@ class HugoThemeCheckTests(unittest.TestCase):
 
             self.assertTrue(any("appears blank" in warning["message"] for warning in result["warnings"]))
 
+    def test_png_pixel_sanity_rejects_oversized_dimensions(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            image = Path(tmp) / "oversized.png"
+            write_png(image, 12, 8)
+            data = bytearray(image.read_bytes())
+            data[16:20] = (20_000).to_bytes(4, "big")
+            data[20:24] = (20_000).to_bytes(4, "big")
+            image.write_bytes(data)
+
+            ok, message = hugo_theme_check.png_pixel_sanity(image)
+
+        self.assertFalse(ok)
+        self.assertIn("too large", message)
+
     def test_check_preview_warns_on_missing_preview(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             result = {"warnings": [], "info": [], "errors": []}

@@ -47,6 +47,8 @@ FAVICON_CANDIDATES = [
     "assets/icons/favicon.svg",
     "assets/icons/site.webmanifest",
 ]
+MAX_PREVIEW_IMAGE_BYTES = 25 * 1024 * 1024
+MAX_PREVIEW_PIXELS = 12_000_000
 MARKDOWN_LINK_RE = re.compile(r"(?<!!)\[[^\]]+\]\(([^)\s]+)(?:\s+\"[^\"]*\")?\)")
 CONTENT_ASSET_SUFFIXES = {
     ".avif",
@@ -108,8 +110,10 @@ def image_size(path: Path) -> tuple[int, int] | None:
                             return None
                         height, width = struct.unpack(">HH", data[1:5])
                         return int(width), int(height)
+                    if size < 2:
+                        return None
                     handle.seek(size - 2, os.SEEK_CUR)
-    except OSError:
+    except (IndexError, OSError, struct.error):
         return None
     return None
 
@@ -198,6 +202,8 @@ def classify_root_content(path: Path, root_content: Path) -> str:
 
 def png_pixel_sanity(path: Path) -> tuple[bool | None, str]:
     try:
+        if path.stat().st_size > MAX_PREVIEW_IMAGE_BYTES:
+            return False, f"Preview image is too large for pixel sanity check: {path.stat().st_size} bytes"
         data = path.read_bytes()
     except OSError as exc:
         return False, f"Unable to read preview image: {exc}"
@@ -225,13 +231,21 @@ def png_pixel_sanity(path: Path) -> tuple[bool | None, str]:
 
     if width is None or height is None or bit_depth != 8 or color_type not in {2, 6} or interlace != 0:
         return None, "Pixel sanity check skipped for unsupported PNG format"
+    if width <= 0 or height <= 0 or width * height > MAX_PREVIEW_PIXELS:
+        return False, f"Preview image is too large for pixel sanity check: {width}x{height}"
 
     channels = 4 if color_type == 6 else 3
     stride = width * channels
+    expected_raw_size = (stride + 1) * height
     try:
-        raw = zlib.decompress(compressed)
+        decompressor = zlib.decompressobj()
+        raw = decompressor.decompress(compressed, expected_raw_size + 1)
     except zlib.error as exc:
         return False, f"Unable to decompress PNG pixels: {exc}"
+    if len(raw) > expected_raw_size or decompressor.unconsumed_tail:
+        return False, "PNG pixel data exceeds the expected size"
+    if len(raw) != expected_raw_size:
+        return False, "PNG pixel data is incomplete"
 
     rows: list[bytes] = []
     previous = bytearray(stride)

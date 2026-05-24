@@ -74,6 +74,14 @@ class FakeResponse:
         return self.body
 
 
+class FakeOpener:
+    def __init__(self, response: FakeResponse) -> None:
+        self.response = response
+
+    def open(self, _request: object, timeout: int) -> FakeResponse:
+        return self.response
+
+
 class RenderThemePreviewTests(unittest.TestCase):
     def test_parse_size_accepts_width_x_height(self) -> None:
         self.assertEqual(render_theme_preview.parse_size("1500x1000"), (1500, 1000))
@@ -131,7 +139,11 @@ class RenderThemePreviewTests(unittest.TestCase):
 
     def test_resolve_preview_url_uses_same_origin_canonical_from_root(self) -> None:
         body = b'<html><head><link rel="canonical" href="/en/"></head></html>'
-        with mock.patch.object(render_theme_preview.urllib.request, "urlopen", return_value=FakeResponse("http://127.0.0.1:1313/", body)):
+        with mock.patch.object(
+            render_theme_preview.urllib.request,
+            "build_opener",
+            return_value=FakeOpener(FakeResponse("http://127.0.0.1:1313/", body)),
+        ):
             url, info, warnings = render_theme_preview.resolve_preview_url("http://127.0.0.1:1313/", 1)
 
         self.assertEqual(url, "http://127.0.0.1:1313/en/")
@@ -140,11 +152,20 @@ class RenderThemePreviewTests(unittest.TestCase):
 
     def test_resolve_preview_url_uses_same_origin_meta_refresh(self) -> None:
         body = b'<html><head><meta http-equiv="refresh" content="0; url=/ru/"></head></html>'
-        with mock.patch.object(render_theme_preview.urllib.request, "urlopen", return_value=FakeResponse("http://127.0.0.1:1313/", body)):
+        with mock.patch.object(
+            render_theme_preview.urllib.request,
+            "build_opener",
+            return_value=FakeOpener(FakeResponse("http://127.0.0.1:1313/", body)),
+        ):
             url, _info, warnings = render_theme_preview.resolve_preview_url("http://127.0.0.1:1313/", 1)
 
         self.assertEqual(url, "http://127.0.0.1:1313/ru/")
         self.assertEqual(warnings, [])
+
+    def test_validate_preview_url_blocks_remote_by_default(self) -> None:
+        self.assertIsNone(render_theme_preview.validate_preview_url("http://127.0.0.1:1313/", False))
+        self.assertIsNone(render_theme_preview.validate_preview_url("http://example.com/", True))
+        self.assertIn("local", render_theme_preview.validate_preview_url("http://example.com/", False) or "")
 
     def test_png_pixel_sanity_rejects_blank_image(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
@@ -165,6 +186,20 @@ class RenderThemePreviewTests(unittest.TestCase):
 
         self.assertTrue(ok)
         self.assertIn("Pixel sanity check passed", message)
+
+    def test_png_pixel_sanity_rejects_oversized_dimensions(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            image = Path(tmp) / "oversized.png"
+            write_png(image, 12, 8)
+            data = bytearray(image.read_bytes())
+            data[16:20] = (20_000).to_bytes(4, "big")
+            data[20:24] = (20_000).to_bytes(4, "big")
+            image.write_bytes(data)
+
+            ok, message = render_theme_preview.png_pixel_sanity(image)
+
+        self.assertFalse(ok)
+        self.assertIn("too large", message)
 
     def test_main_reports_missing_browser_as_json(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
