@@ -34,11 +34,31 @@ The skill can still guide implementation without every optional tool installed, 
 
 ## Installation
 
-Clone or copy this directory into your Codex skills directory:
+Clone or copy this directory into your Codex skills directory. If `CODEX_HOME`
+is not set, use `~/.codex`. Do not run `mkdir -p "$CODEX_HOME/skills"` with an
+empty `CODEX_HOME`: it expands to `/skills`, which is read-only on many macOS
+systems.
 
 ```bash
-mkdir -p "$CODEX_HOME/skills"
-git clone https://github.com/dukebarman/hugo-theme-from-design.git "$CODEX_HOME/skills/hugo-theme-from-design"
+SKILLS_DIR="${CODEX_HOME:-$HOME/.codex}/skills"
+mkdir -p "$SKILLS_DIR"
+git clone https://github.com/dukebarman/hugo-theme-from-design.git "$SKILLS_DIR/hugo-theme-from-design"
+```
+
+If your agent runner loads skills from Agents-style directories, install it
+there instead:
+
+```bash
+mkdir -p "$HOME/.agents/skills"
+git clone https://github.com/dukebarman/hugo-theme-from-design.git "$HOME/.agents/skills/hugo-theme-from-design"
+```
+
+For a project-local install, clone it under the project:
+
+```bash
+cd /path/to/your-hugo-project
+mkdir -p .agents/skills
+git clone https://github.com/dukebarman/hugo-theme-from-design.git .agents/skills/hugo-theme-from-design
 ```
 
 Then invoke it in Codex with:
