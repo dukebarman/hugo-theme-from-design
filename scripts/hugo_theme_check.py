@@ -73,12 +73,42 @@ def add(result: dict, level: str, message: str, path: Path | None = None) -> Non
     result[level].append(entry)
 
 
+def parse_basic_toml_value(value: str) -> object:
+    value = value.strip()
+    if value.lower() == "true":
+        return True
+    if value.lower() == "false":
+        return False
+    if (value.startswith("'") and value.endswith("'")) or (value.startswith('"') and value.endswith('"')):
+        return value[1:-1]
+    return value
+
+
+def parse_basic_toml(text: str) -> dict:
+    data: dict = {}
+    current = data
+    for raw_line in text.splitlines():
+        line = raw_line.split("#", 1)[0].strip()
+        if not line:
+            continue
+        if line.startswith("[") and line.endswith("]"):
+            current = data
+            for part in line[1:-1].split("."):
+                current = current.setdefault(part.strip(), {})
+            continue
+        if "=" not in line:
+            continue
+        key, value = line.split("=", 1)
+        current[key.strip()] = parse_basic_toml_value(value)
+    return data
+
+
 def read_toml(path: Path, result: dict) -> dict:
-    if tomllib is None:
-        add(result, "warnings", "Python tomllib is unavailable; skipping TOML parsing", path)
-        return {}
     try:
-        return tomllib.loads(path.read_text(encoding="utf-8"))
+        text = path.read_text(encoding="utf-8")
+        if tomllib is not None:
+            return tomllib.loads(text)
+        return parse_basic_toml(text)
     except Exception as exc:  # noqa: BLE001 - report parse failure as validation data
         add(result, "errors", f"Unable to parse TOML: {exc}", path)
         return {}

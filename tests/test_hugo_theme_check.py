@@ -60,6 +60,29 @@ class HugoThemeCheckTests(unittest.TestCase):
 
             self.assertTrue(hugo_theme_check.has_hugo_config(base))
 
+    def test_read_toml_falls_back_without_tomllib(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            config = Path(tmp) / "hugo.toml"
+            config.write_text(
+                "\n".join(
+                    [
+                        "defaultContentLanguageInSubdir = true",
+                        "[languages.en]",
+                        "languageName = 'English'",
+                    ]
+                ),
+                encoding="utf-8",
+            )
+            result = {"warnings": [], "info": [], "errors": []}
+
+            with mock.patch.object(hugo_theme_check, "tomllib", None):
+                data = hugo_theme_check.read_toml(config, result)
+
+            self.assertEqual(result["errors"], [])
+            self.assertEqual(result["warnings"], [])
+            self.assertTrue(data["defaultContentLanguageInSubdir"])
+            self.assertEqual(data["languages"]["en"]["languageName"], "English")
+
     def test_classify_root_content_support_vs_sample(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             content = Path(tmp) / "content"
