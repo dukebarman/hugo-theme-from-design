@@ -20,12 +20,21 @@ assert SPEC.loader is not None
 SPEC.loader.exec_module(hugo_theme_check)
 
 
-def write_png(path: Path, width: int, height: int) -> None:
+def write_png(path: Path, width: int, height: int, *, varied: bool = False) -> None:
     def chunk(kind: bytes, data: bytes) -> bytes:
         checksum = zlib.crc32(kind + data) & 0xFFFFFFFF
         return struct.pack(">I", len(data)) + kind + data + struct.pack(">I", checksum)
 
-    raw = b"".join(b"\x00" + (b"\xff\xff\xff" * width) for _ in range(height))
+    rows = []
+    for y in range(height):
+        pixels = bytearray()
+        for x in range(width):
+            if varied and (x + y) % 9 == 0:
+                pixels.extend((20, 90, 160))
+            else:
+                pixels.extend((255, 255, 255))
+        rows.append(b"\x00" + bytes(pixels))
+    raw = b"".join(rows)
     data = (
         b"\x89PNG\r\n\x1a\n"
         + chunk(b"IHDR", struct.pack(">IIBBBBB", width, height, 8, 2, 0, 0, 0))
@@ -75,13 +84,24 @@ class HugoThemeCheckTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as tmp:
             theme = Path(tmp)
             (theme / "images").mkdir()
-            write_png(theme / "images" / "screenshot.png", 1500, 1000)
+            write_png(theme / "images" / "screenshot.png", 1500, 1000, varied=True)
             result = {"warnings": [], "info": [], "errors": []}
 
             hugo_theme_check.check_preview(result, theme, "screenshot", (1500, 1000))
 
             self.assertEqual(result["warnings"], [])
-            self.assertEqual(len(result["info"]), 1)
+            self.assertTrue(any("Pixel sanity check passed" in entry["message"] for entry in result["info"]))
+
+    def test_check_preview_warns_on_blank_png(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            theme = Path(tmp)
+            (theme / "images").mkdir()
+            write_png(theme / "images" / "screenshot.png", 1500, 1000)
+            result = {"warnings": [], "info": [], "errors": []}
+
+            hugo_theme_check.check_preview(result, theme, "screenshot", (1500, 1000))
+
+            self.assertTrue(any("appears blank" in warning["message"] for warning in result["warnings"]))
 
     def test_check_preview_warns_on_missing_preview(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
@@ -114,12 +134,52 @@ class HugoThemeCheckTests(unittest.TestCase):
             self.assertEqual(cwd, site)
             self.assertEqual(command, ["hugo", "--theme", "demo"])
 
+    def test_partials_state_does_not_treat_empty_directory_as_detected(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            layouts = Path(tmp) / "layouts"
+            (layouts / "_partials").mkdir(parents=True)
+
+            kind, path, has_files = hugo_theme_check.partials_state(layouts)
+
+            self.assertEqual(kind, "modern")
+            self.assertEqual(path, layouts / "_partials")
+            self.assertFalse(has_files)
+
+    def test_multilingual_links_warn_when_link_leaves_language_branch(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            example_site = Path(tmp) / "exampleSite"
+            (example_site / "content" / "en" / "posts").mkdir(parents=True)
+            (example_site / "content" / "ru" / "posts").mkdir(parents=True)
+            (example_site / "hugo.toml").write_text(
+                "\n".join(
+                    [
+                        "defaultContentLanguageInSubdir = true",
+                        "[languages.en]",
+                        "languageName = 'English'",
+                        "[languages.ru]",
+                        "languageName = 'Russian'",
+                    ]
+                ),
+                encoding="utf-8",
+            )
+            (example_site / "content" / "en" / "posts" / "one.md").write_text(
+                "[Good](/en/posts/two/) [Bad](/posts/two/) [Asset](/images/a.png)\n",
+                encoding="utf-8",
+            )
+            result = {"warnings": [], "info": [], "errors": []}
+
+            hugo_theme_check.check_multilingual_links(result, example_site)
+
+            self.assertEqual(len(result["warnings"]), 1)
+            self.assertIn("'en' branch", result["warnings"][0]["message"])
+
     def test_publication_warns_about_theme_root_build_artifacts(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             theme = Path(tmp)
             for directory in ("archetypes", "assets", "content", "data", "i18n", "layouts", "static", "public"):
                 (theme / directory).mkdir(parents=True)
             (theme / "layouts" / "_partials").mkdir()
+            (theme / "layouts" / "_partials" / "head.html").write_text("", encoding="utf-8")
             (theme / "layouts" / "home.html").write_text("{{ define \"main\" }}{{ end }}\n", encoding="utf-8")
             (theme / "hugo.yaml").write_text("title: Demo\n", encoding="utf-8")
             (theme / "theme.toml").write_text(

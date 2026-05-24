@@ -75,6 +75,8 @@ The minimum useful `exampleSite` includes:
 - enough sample Markdown to exercise home, section/list, page/single, taxonomy/term, pagination, media cards, navigation, footer, and empty/long text states;
 - sample front matter for design-specific fields such as hero images, eyebrow text, CTAs, featured flags, authors, tags, dates, summaries, external links, and gallery assets.
 
+For multilingual `exampleSite` demos, make language branches complete enough to validate navigation and related-content behavior. If `defaultContentLanguageInSubdir = true`, keep internal demo links inside the same language branch by default, such as `/en/post/` from English pages and `/ru/post/` from Russian pages, unless the design explicitly demonstrates cross-language links.
+
 Keep generated demo content credible but lightweight. Do not put built output such as `public/` or `.hugo_build.lock` into the theme unless the user explicitly wants generated artifacts.
 
 ## Production Readiness
@@ -133,7 +135,9 @@ Read `references/ux-ui-checklist.md` before final visual verification. Treat it 
 - then check responsive behavior, accessibility, interaction states, content density, and Hugo-specific authoring ergonomics;
 - do not add marketing copy or feature explanations unless the design calls for them.
 
-Use browser screenshots when a local server can run. Prefer whatever headless browser is available in the environment, such as Playwright, Chromium/Chrome, Firefox, WebKit, or another browser already installed by the project. Check desktop and mobile widths. If Firefox on macOS is used while a regular Firefox session is open, run it with a temporary profile, for example `firefox --headless --profile /tmp/<profile> --screenshot /tmp/<theme>.png --window-size 1440,1000 <url>`. If no browser screenshot tool is available, report that visual verification was limited to Hugo build, rendered HTML, and CSS/DOM inspection. Fix text overflow, overlapping UI, broken image crops, illegible contrast, broken controls, and navigation states.
+Use browser screenshots when a local server can run. Prefer whatever headless browser is available in the environment, such as Playwright, Chromium/Chrome, Firefox, WebKit, or another browser already installed by the project. Check desktop and mobile widths. Before capturing, preflight the requested URL with an HTTP/HTML check and capture the final page when the root responds with an HTTP redirect, meta refresh, or same-origin canonical URL. For multilingual sites with `defaultContentLanguageInSubdir = true`, do not assume `/` is the usable preview page; determine and capture the rendered language URL such as `/en/` or `/ru/`. If Firefox on macOS is used while a regular Firefox session is open, run it with a temporary profile, for example `firefox --headless --profile /tmp/<profile> --screenshot /tmp/<theme>.png --window-size 1440,1000 <url>`. If Firefox headless produces a blank or invalid screenshot under sandboxing, repeat with an approved regular headless Firefox command and inspect the resulting image before trusting it. If no browser screenshot tool is available, report that visual verification was limited to Hugo build, rendered HTML, and CSS/DOM inspection. Fix text overflow, overlapping UI, broken image crops, illegible contrast, broken controls, and navigation states.
+
+Do not make critical hero text depend on an initial `opacity: 0` animation state for screenshot capture. Either keep essential text visible without JavaScript and animation completion, honor `prefers-reduced-motion`, or wait/disable animations in the capture path before accepting preview images.
 
 When a local server is running and Firefox, Chrome, or Chromium is available, use the bundled screenshot helper to generate theme-store preview images from the rendered theme instead of drawing placeholder previews:
 
@@ -152,7 +156,7 @@ python3 scripts/hugo_theme_check.py --theme-dir /path/to/theme --publication
 python3 scripts/hugo_theme_check.py --theme-dir /path/to/theme --mode port --publication
 ```
 
-The checker emits JSON with `errors`, `warnings`, `info`, and an overall `ok` flag. Use default `--mode new` for generated variants with `exampleSite`; use `--mode port` for known-theme ports where compatibility, attribution, README/license, and original structure matter more than Hugo's generated skeleton. Add `--publication` when preparing a GitHub/public theme package. Still run Hugo itself and inspect the rendered site for visual quality.
+The checker emits JSON with `errors`, `warnings`, `info`, and an overall `ok` flag. Use default `--mode new` for generated variants with `exampleSite`; use `--mode port` for known-theme ports where compatibility, attribution, README/license, and original structure matter more than Hugo's generated skeleton. Add `--publication` when preparing a GitHub/public theme package. Preview image validation should check dimensions, aspect ratio, and pixel sanity; a generated PNG is not successful if it is blank, nearly all white/black, or just a single background color. Empty `layouts/_partials` or `layouts/partials` directories are not evidence of a modern or legacy implementation. Still run Hugo itself and inspect the rendered site for visual quality.
 
 For skill development, run the bundled unit tests after changing scripts:
 
