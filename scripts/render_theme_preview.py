@@ -4,11 +4,18 @@
 from __future__ import annotations
 
 import argparse
+from html.parser import HTMLParser
+import ipaddress
 import json
+import re
 import shutil
 import subprocess
 import sys
 import tempfile
+import urllib.error
+import urllib.parse
+import urllib.request
+import zlib
 from pathlib import Path
 
 
@@ -27,6 +34,30 @@ BROWSERS = {
         "chromium-browser",
     ],
 }
+MAX_PREVIEW_IMAGE_BYTES = 25 * 1024 * 1024
+MAX_PREVIEW_PIXELS = 12_000_000
+MAX_PREVIEW_REDIRECTS = 5
+
+
+class PreviewURLParser(HTMLParser):
+    def __init__(self) -> None:
+        super().__init__()
+        self.meta_refresh: str | None = None
+        self.canonical: str | None = None
+
+    def handle_starttag(self, tag: str, attrs: list[tuple[str, str | None]]) -> None:
+        values = {name.lower(): value for name, value in attrs if value is not None}
+        if tag.lower() == "meta" and values.get("http-equiv", "").lower() == "refresh":
+            match = re.search(r"(?:^|;)\s*url\s*=\s*([^;]+)", values.get("content", ""), re.IGNORECASE)
+            if match:
+                self.meta_refresh = match.group(1).strip(" '\"")
+        if tag.lower() == "link" and "canonical" in values.get("rel", "").lower().split():
+            self.canonical = values.get("href")
+
+
+class NoRedirectHandler(urllib.request.HTTPRedirectHandler):
+    def redirect_request(self, req, fp, code, msg, headers, newurl):  # type: ignore[no-untyped-def]
+        return None
 
 
 def add(result: dict, level: str, message: str, path: Path | None = None) -> None:
@@ -67,6 +98,102 @@ def detect_browser(preference: str) -> tuple[str, Path] | None:
     return None
 
 
+def same_origin(left: str, right: str) -> bool:
+    left_url = urllib.parse.urlparse(left)
+    right_url = urllib.parse.urlparse(right)
+    return (left_url.scheme, left_url.netloc) == (right_url.scheme, right_url.netloc)
+
+
+def is_local_preview_url(url: str) -> bool:
+    parsed = urllib.parse.urlparse(url)
+    if parsed.scheme not in {"http", "https"} or not parsed.hostname:
+        return False
+    hostname = parsed.hostname.lower()
+    if hostname == "localhost" or hostname.endswith(".localhost"):
+        return True
+    try:
+        return ipaddress.ip_address(hostname).is_loopback
+    except ValueError:
+        return False
+
+
+def validate_preview_url(url: str, allow_remote: bool) -> str | None:
+    parsed = urllib.parse.urlparse(url)
+    if parsed.scheme not in {"http", "https"} or not parsed.netloc:
+        return "Preview URL must be an absolute http:// or https:// URL"
+    if not allow_remote and not is_local_preview_url(url):
+        return "Preview URL must be local by default; pass --allow-remote-url to capture a remote URL intentionally"
+    return None
+
+
+def resolve_preview_url(url: str, timeout: int, allow_remote: bool = False) -> tuple[str, list[str], list[str]]:
+    info: list[str] = []
+    warnings: list[str] = []
+    opener = urllib.request.build_opener(NoRedirectHandler)
+    resolved_url = url
+    for _ in range(MAX_PREVIEW_REDIRECTS + 1):
+        request = urllib.request.Request(resolved_url, headers={"User-Agent": "hugo-theme-preview/1.0"})
+        try:
+            with opener.open(request, timeout=timeout) as response:
+                content_type = response.headers.get("content-type", "")
+                body = response.read(262144)
+                break
+        except urllib.error.HTTPError as exc:
+            if exc.code not in {301, 302, 303, 307, 308}:
+                warnings.append(f"Unable to preflight preview URL; using {resolved_url}: HTTP {exc.code}")
+                return resolved_url, info, warnings
+            location = exc.headers.get("location")
+            if not location:
+                warnings.append(f"HTTP redirect from preview URL had no Location header; using {resolved_url}")
+                return resolved_url, info, warnings
+            target = urllib.parse.urljoin(resolved_url, location)
+            validation_error = validate_preview_url(target, allow_remote)
+            if validation_error:
+                warnings.append(f"Ignoring unsafe HTTP redirect target {target}: {validation_error}")
+                return resolved_url, info, warnings
+            info.append(f"HTTP redirect resolved preview URL to {target}")
+            resolved_url = target
+        except (OSError, urllib.error.URLError) as exc:
+            warnings.append(f"Unable to preflight preview URL; using {resolved_url}: {exc}")
+            return resolved_url, info, warnings
+    else:
+        warnings.append(f"Preview URL exceeded {MAX_PREVIEW_REDIRECTS} redirects; using {resolved_url}")
+        return resolved_url, info, warnings
+
+    if "html" not in content_type.lower():
+        return resolved_url, info, warnings
+
+    parser = PreviewURLParser()
+    try:
+        parser.feed(body.decode("utf-8", errors="replace"))
+    except Exception as exc:  # noqa: BLE001 - keep preview capture resilient
+        warnings.append(f"Unable to parse preview HTML for redirects: {exc}")
+        return resolved_url, info, warnings
+
+    if parser.meta_refresh:
+        target = urllib.parse.urljoin(resolved_url, parser.meta_refresh)
+        validation_error = validate_preview_url(target, allow_remote)
+        if validation_error:
+            warnings.append(f"Ignoring unsafe meta refresh preview URL {target}: {validation_error}")
+        elif same_origin(resolved_url, target):
+            info.append(f"Meta refresh resolved preview URL to {target}")
+            return target, info, warnings
+        else:
+            warnings.append(f"Ignoring cross-origin meta refresh preview URL: {target}")
+    if parser.canonical:
+        target = urllib.parse.urljoin(resolved_url, parser.canonical)
+        source_path = urllib.parse.urlparse(resolved_url).path or "/"
+        validation_error = validate_preview_url(target, allow_remote)
+        if validation_error:
+            warnings.append(f"Ignoring unsafe canonical preview URL {target}: {validation_error}")
+        elif target != resolved_url and same_origin(resolved_url, target) and source_path in {"", "/"}:
+            info.append(f"Canonical URL resolved root preview URL to {target}")
+            return target, info, warnings
+        elif target != resolved_url:
+            warnings.append(f"Canonical URL differs from preview URL: {target}")
+    return resolved_url, info, warnings
+
+
 def browser_command(browser: str, executable: Path, url: str, output: Path, size: tuple[int, int], profile: Path | None) -> list[str]:
     width, height = size
     if browser == "firefox":
@@ -86,6 +213,8 @@ def browser_command(browser: str, executable: Path, url: str, output: Path, size
         str(executable),
         "--headless=new",
         "--disable-gpu",
+        "--run-all-compositor-stages-before-draw",
+        "--virtual-time-budget=3000",
         f"--screenshot={output}",
         f"--window-size={width},{height}",
         url,
@@ -125,6 +254,115 @@ def capture(browser: str, executable: Path, url: str, output: Path, size: tuple[
     return code == 0 and output.exists(), output_text
 
 
+def png_pixel_sanity(path: Path) -> tuple[bool | None, str]:
+    try:
+        if path.stat().st_size > MAX_PREVIEW_IMAGE_BYTES:
+            return False, f"Preview image is too large for pixel sanity check: {path.stat().st_size} bytes"
+        data = path.read_bytes()
+    except OSError as exc:
+        return False, f"Unable to read preview image: {exc}"
+    if not data.startswith(b"\x89PNG\r\n\x1a\n"):
+        return None, "Pixel sanity check skipped for non-PNG preview"
+
+    offset = 8
+    width = height = bit_depth = color_type = interlace = None
+    compressed = b""
+    while offset + 8 <= len(data):
+        length = int.from_bytes(data[offset : offset + 4], "big")
+        kind = data[offset + 4 : offset + 8]
+        chunk = data[offset + 8 : offset + 8 + length]
+        offset += 12 + length
+        if kind == b"IHDR":
+            width = int.from_bytes(chunk[0:4], "big")
+            height = int.from_bytes(chunk[4:8], "big")
+            bit_depth = chunk[8]
+            color_type = chunk[9]
+            interlace = chunk[12]
+        elif kind == b"IDAT":
+            compressed += chunk
+        elif kind == b"IEND":
+            break
+
+    if width is None or height is None or bit_depth != 8 or color_type not in {2, 6} or interlace != 0:
+        return None, "Pixel sanity check skipped for unsupported PNG format"
+    if width <= 0 or height <= 0 or width * height > MAX_PREVIEW_PIXELS:
+        return False, f"Preview image is too large for pixel sanity check: {width}x{height}"
+
+    channels = 4 if color_type == 6 else 3
+    stride = width * channels
+    expected_raw_size = (stride + 1) * height
+    try:
+        decompressor = zlib.decompressobj()
+        raw = decompressor.decompress(compressed, expected_raw_size + 1)
+    except zlib.error as exc:
+        return False, f"Unable to decompress PNG pixels: {exc}"
+    if len(raw) > expected_raw_size or decompressor.unconsumed_tail:
+        return False, "PNG pixel data exceeds the expected size"
+    if len(raw) != expected_raw_size:
+        return False, "PNG pixel data is incomplete"
+
+    rows: list[bytes] = []
+    previous = bytearray(stride)
+    index = 0
+    for _ in range(height):
+        if index >= len(raw):
+            return False, "PNG pixel data ended before all rows were decoded"
+        filter_type = raw[index]
+        index += 1
+        row = bytearray(raw[index : index + stride])
+        index += stride
+        if len(row) != stride:
+            return False, "PNG row data is incomplete"
+        for i, value in enumerate(row):
+            left = row[i - channels] if i >= channels else 0
+            up = previous[i]
+            up_left = previous[i - channels] if i >= channels else 0
+            if filter_type == 1:
+                row[i] = (value + left) & 0xFF
+            elif filter_type == 2:
+                row[i] = (value + up) & 0xFF
+            elif filter_type == 3:
+                row[i] = (value + ((left + up) // 2)) & 0xFF
+            elif filter_type == 4:
+                predictor = left + up - up_left
+                pa = abs(predictor - left)
+                pb = abs(predictor - up)
+                pc = abs(predictor - up_left)
+                row[i] = (value + (left if pa <= pb and pa <= pc else up if pb <= pc else up_left)) & 0xFF
+            elif filter_type != 0:
+                return None, f"Pixel sanity check skipped for unsupported PNG filter {filter_type}"
+        rows.append(bytes(row))
+        previous = row
+
+    step = max(1, (width * height) // 12000)
+    colors: dict[tuple[int, int, int], int] = {}
+    luminance_min = 255
+    luminance_max = 0
+    samples = 0
+    pixel_index = 0
+    for row in rows:
+        for column in range(0, stride, channels):
+            if pixel_index % step == 0:
+                color = tuple(row[column : column + 3])
+                luminance = round((color[0] * 0.2126) + (color[1] * 0.7152) + (color[2] * 0.0722))
+                luminance_min = min(luminance_min, luminance)
+                luminance_max = max(luminance_max, luminance)
+                colors[color] = colors.get(color, 0) + 1
+                samples += 1
+            pixel_index += 1
+
+    if samples == 0:
+        return False, "Preview image contains no sampled pixels"
+    dominant_ratio = max(colors.values()) / samples
+    if len(colors) <= 1:
+        return False, "Preview image appears blank: all sampled pixels are identical"
+    if luminance_max - luminance_min < 8:
+        return False, "Preview image appears blank: sampled pixels have very low luminance variation"
+    if dominant_ratio > 0.995:
+        return False, "Preview image appears to be mostly a single background color"
+    return True, f"Pixel sanity check passed: {len(colors)} sampled colors, luminance range {luminance_min}-{luminance_max}"
+
+
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--url", required=True, help="Rendered local site URL, for example http://127.0.0.1:1313/")
@@ -133,6 +371,7 @@ def main() -> int:
     parser.add_argument("--screenshot-size", type=parse_size, default=(1500, 1000), help="Full screenshot size, default 1500x1000")
     parser.add_argument("--thumbnail-size", type=parse_size, default=(900, 600), help="Thumbnail size, default 900x600")
     parser.add_argument("--timeout", type=int, default=30, help="Browser command timeout in seconds")
+    parser.add_argument("--allow-remote-url", action="store_true", help="Allow capturing a non-local preview URL")
     args = parser.parse_args()
 
     theme_dir = args.theme_dir.resolve()
@@ -162,16 +401,34 @@ def main() -> int:
         return 1
     add(result, "info", f"Using {browser_name}: {executable}")
 
+    validation_error = validate_preview_url(args.url, args.allow_remote_url)
+    if validation_error:
+        add(result, "errors", validation_error)
+        result["ok"] = False
+        print(json.dumps(result, indent=2, ensure_ascii=False))
+        return 1
+
+    preview_url, url_info, url_warnings = resolve_preview_url(args.url, args.timeout, args.allow_remote_url)
+    for message in url_info:
+        add(result, "info", message)
+    for message in url_warnings:
+        add(result, "warnings", message)
+
     targets = [
         ("screenshot.png", args.screenshot_size),
         ("tn.png", args.thumbnail_size),
     ]
     for filename, size in targets:
         output = images_dir / filename
-        ok, output_text = capture(browser_name, executable, args.url, output, size, args.timeout)
+        ok, output_text = capture(browser_name, executable, preview_url, output, size, args.timeout)
         if ok:
-            result["files"].append(str(output))
-            add(result, "info", f"Captured {filename} at {size[0]}x{size[1]}", output)
+            pixel_ok, pixel_message = png_pixel_sanity(output)
+            if pixel_ok is False:
+                add(result, "errors", pixel_message, output)
+            else:
+                result["files"].append(str(output))
+                add(result, "info", f"Captured {filename} at {size[0]}x{size[1]}", output)
+                add(result, "info" if pixel_ok else "warnings", pixel_message, output)
         else:
             detail = f": {output_text}" if output_text else ""
             add(result, "errors", f"Failed to capture {filename}{detail}", output)

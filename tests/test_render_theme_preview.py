@@ -8,6 +8,8 @@ import subprocess
 import sys
 import tempfile
 import unittest
+import zlib
+import struct
 from pathlib import Path
 from unittest import mock
 
@@ -17,6 +19,67 @@ SPEC = importlib.util.spec_from_file_location("render_theme_preview", SCRIPT)
 render_theme_preview = importlib.util.module_from_spec(SPEC)
 assert SPEC.loader is not None
 SPEC.loader.exec_module(render_theme_preview)
+
+
+def write_png(path: Path, width: int, height: int, *, varied: bool = False) -> None:
+    def chunk(kind: bytes, data: bytes) -> bytes:
+        checksum = zlib.crc32(kind + data) & 0xFFFFFFFF
+        return struct.pack(">I", len(data)) + kind + data + struct.pack(">I", checksum)
+
+    rows = []
+    for y in range(height):
+        pixels = bytearray()
+        for x in range(width):
+            if varied and (x + y) % 5 == 0:
+                pixels.extend((12, 80, 150))
+            else:
+                pixels.extend((255, 255, 255))
+        rows.append(b"\x00" + bytes(pixels))
+    raw = b"".join(rows)
+    data = (
+        b"\x89PNG\r\n\x1a\n"
+        + chunk(b"IHDR", struct.pack(">IIBBBBB", width, height, 8, 2, 0, 0, 0))
+        + chunk(b"IDAT", zlib.compress(raw))
+        + chunk(b"IEND", b"")
+    )
+    path.write_bytes(data)
+
+
+class FakeHeaders:
+    def __init__(self, content_type: str) -> None:
+        self.content_type = content_type
+
+    def get(self, name: str, default: str = "") -> str:
+        if name.lower() == "content-type":
+            return self.content_type
+        return default
+
+
+class FakeResponse:
+    def __init__(self, url: str, body: bytes, content_type: str = "text/html") -> None:
+        self.url = url
+        self.body = body
+        self.headers = FakeHeaders(content_type)
+
+    def __enter__(self) -> "FakeResponse":
+        return self
+
+    def __exit__(self, *args: object) -> None:
+        return None
+
+    def geturl(self) -> str:
+        return self.url
+
+    def read(self, _size: int) -> bytes:
+        return self.body
+
+
+class FakeOpener:
+    def __init__(self, response: FakeResponse) -> None:
+        self.response = response
+
+    def open(self, _request: object, timeout: int) -> FakeResponse:
+        return self.response
 
 
 class RenderThemePreviewTests(unittest.TestCase):
@@ -63,6 +126,7 @@ class RenderThemePreviewTests(unittest.TestCase):
         )
 
         self.assertIn("--headless=new", command)
+        self.assertIn("--virtual-time-budget=3000", command)
         self.assertIn("--screenshot=/tmp/out.png", command)
         self.assertIn("--window-size=900,600", command)
 
@@ -72,6 +136,70 @@ class RenderThemePreviewTests(unittest.TestCase):
 
         self.assertEqual(code, 124)
         self.assertIn("timed out", output)
+
+    def test_resolve_preview_url_uses_same_origin_canonical_from_root(self) -> None:
+        body = b'<html><head><link rel="canonical" href="/en/"></head></html>'
+        with mock.patch.object(
+            render_theme_preview.urllib.request,
+            "build_opener",
+            return_value=FakeOpener(FakeResponse("http://127.0.0.1:1313/", body)),
+        ):
+            url, info, warnings = render_theme_preview.resolve_preview_url("http://127.0.0.1:1313/", 1)
+
+        self.assertEqual(url, "http://127.0.0.1:1313/en/")
+        self.assertTrue(any("Canonical URL" in message for message in info))
+        self.assertEqual(warnings, [])
+
+    def test_resolve_preview_url_uses_same_origin_meta_refresh(self) -> None:
+        body = b'<html><head><meta http-equiv="refresh" content="0; url=/ru/"></head></html>'
+        with mock.patch.object(
+            render_theme_preview.urllib.request,
+            "build_opener",
+            return_value=FakeOpener(FakeResponse("http://127.0.0.1:1313/", body)),
+        ):
+            url, _info, warnings = render_theme_preview.resolve_preview_url("http://127.0.0.1:1313/", 1)
+
+        self.assertEqual(url, "http://127.0.0.1:1313/ru/")
+        self.assertEqual(warnings, [])
+
+    def test_validate_preview_url_blocks_remote_by_default(self) -> None:
+        self.assertIsNone(render_theme_preview.validate_preview_url("http://127.0.0.1:1313/", False))
+        self.assertIsNone(render_theme_preview.validate_preview_url("http://example.com/", True))
+        self.assertIn("local", render_theme_preview.validate_preview_url("http://example.com/", False) or "")
+
+    def test_png_pixel_sanity_rejects_blank_image(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            image = Path(tmp) / "blank.png"
+            write_png(image, 12, 8)
+
+            ok, message = render_theme_preview.png_pixel_sanity(image)
+
+        self.assertFalse(ok)
+        self.assertIn("appears blank", message)
+
+    def test_png_pixel_sanity_accepts_varied_image(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            image = Path(tmp) / "varied.png"
+            write_png(image, 12, 8, varied=True)
+
+            ok, message = render_theme_preview.png_pixel_sanity(image)
+
+        self.assertTrue(ok)
+        self.assertIn("Pixel sanity check passed", message)
+
+    def test_png_pixel_sanity_rejects_oversized_dimensions(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            image = Path(tmp) / "oversized.png"
+            write_png(image, 12, 8)
+            data = bytearray(image.read_bytes())
+            data[16:20] = (20_000).to_bytes(4, "big")
+            data[20:24] = (20_000).to_bytes(4, "big")
+            image.write_bytes(data)
+
+            ok, message = render_theme_preview.png_pixel_sanity(image)
+
+        self.assertFalse(ok)
+        self.assertIn("too large", message)
 
     def test_main_reports_missing_browser_as_json(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
