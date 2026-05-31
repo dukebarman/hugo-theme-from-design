@@ -34,6 +34,7 @@ Use `$hugo-theme-from-design` when you want Codex to:
 
 - Codex with local skills support.
 - Hugo available on `PATH` for build validation.
+  Tested with Hugo `v0.162.1+extended+withdeploy`.
 - Python 3.10 or newer for the helper scripts.
 - Firefox, Chrome, or Chromium for automated preview image capture.
 
