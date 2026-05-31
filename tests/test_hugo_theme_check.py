@@ -444,11 +444,12 @@ class HugoThemeCheckTests(unittest.TestCase):
             theme = Path(tmp)
             (theme / "exampleSite" / "content").mkdir(parents=True)
             (theme / "README.md").write_text(
-                "Set `heroImage = \"/images/hero.jpg\"` and `tagsURL = \"/en/tags/\"`.\n",
+                "Set `heroImage = \"/images/hero.jpg\"`, `postsURL = \"/posts/\"`, and `aboutURL = \"/about\"`.\n",
                 encoding="utf-8",
             )
+            (theme / "exampleSite" / "hugo.toml").write_text('pageRef = "/tags"\n', encoding="utf-8")
             (theme / "exampleSite" / "content" / "_index.md").write_text(
-                "---\nheroImage: /images/about.png\n---\nBody /images/body.png\n",
+                "---\nheroImage: /images/about.png\n---\n[Post](/posts/foo/) and body /images/body.png\n",
                 encoding="utf-8",
             )
             result = {"warnings": [], "info": [], "errors": []}
@@ -456,9 +457,49 @@ class HugoThemeCheckTests(unittest.TestCase):
             hugo_theme_check.check_subpath_safe_user_paths(result, theme)
 
             messages = [warning["message"] for warning in result["warnings"]]
-            self.assertEqual(len(messages), 3)
+            self.assertEqual(len(messages), 6)
             self.assertTrue(all("root-relative" in message for message in messages))
-            self.assertTrue(any("/en/tags/" in message for message in messages))
+            self.assertTrue(any("/posts/" in message for message in messages))
+            self.assertTrue(any("/about" in message for message in messages))
+            self.assertTrue(any("/images/hero.jpg" in message for message in messages))
+            self.assertTrue(any("/tags" in message for message in messages))
+            self.assertTrue(any("/posts/foo/" in message for message in messages))
+
+    def test_subpath_safe_user_paths_ignores_absolute_urls(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            theme = Path(tmp)
+            (theme / "exampleSite" / "content").mkdir(parents=True)
+            (theme / "exampleSite" / "hugo.toml").write_text(
+                'baseURL = "https://example.com/"\n'
+                'homepage = "http://example.org/path"\n'
+                'cdn = "//cdn.example.org/site.css"\n',
+                encoding="utf-8",
+            )
+            (theme / "README.md").write_text(
+                "See https://github.com/dukebarman/dragon-lab.git, <https://instantview.telegram.org/docs>, "
+                "mailto:test@example.com, and git@github.com:owner/repo.git.\n",
+                encoding="utf-8",
+            )
+            (theme / "exampleSite" / "content" / "_index.md").write_text(
+                "---\nsource: https://example.com/\n---\n[Docs](https://example.com/)\n",
+                encoding="utf-8",
+            )
+            result = {"warnings": [], "info": [], "errors": []}
+
+            hugo_theme_check.check_subpath_safe_user_paths(result, theme)
+
+            self.assertEqual(result["warnings"], [])
+
+    def test_subpath_safe_user_paths_ignores_example_site_baseurl_path(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            theme = Path(tmp)
+            (theme / "exampleSite").mkdir()
+            (theme / "exampleSite" / "hugo.toml").write_text('baseURL = "/blog/"\n', encoding="utf-8")
+            result = {"warnings": [], "info": [], "errors": []}
+
+            hugo_theme_check.check_subpath_safe_user_paths(result, theme)
+
+            self.assertEqual(result["warnings"], [])
 
     def test_template_root_url_helpers_warn_for_root_relative_inputs(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:

@@ -152,7 +152,7 @@ TELEGRAM_IV_IMAGE_FALLBACK_HINTS = (
 SUBPATH_BASEURL = "https://example.org/blog/"
 DEMO_ASSET_SIZE_LIMIT = 1 * 1024 * 1024
 ROOT_RELATIVE_URL_RE = re.compile(
-    r"""(?<![A-Za-z0-9:+.-])(?P<path>/(?!/|#)[A-Za-z0-9][A-Za-z0-9._~!$&'()*+,;=:@%/\-]*(?:\?[A-Za-z0-9._~!$&'()*+,;=:@%/?\-]*)?)""",
+    r"""(?<![A-Za-z0-9:+./-])(?P<path>/(?!/|#)[A-Za-z0-9][A-Za-z0-9._~!$&'()*+,;=:@%/\-]*(?:\?[A-Za-z0-9._~!$&'()*+,;=:@%/?\-]*)?)""",
     re.IGNORECASE,
 )
 ROOT_RELATIVE_URL_PIPE_RE = re.compile(
@@ -171,6 +171,7 @@ ASSET_URL_SUFFIX_RE = re.compile(r"""\.(?:avif|css|gif|ico|jpe?g|js|mjs|png|svg|
 EXAMPLE_SITE_BASEURL = "https://example.com/"
 BASEURL_TOML_YAML_RE = re.compile(r"""(?im)^\s*baseURL\s*[:=]\s*["']?(?P<url>[^"'\s#]+)""")
 BASEURL_JSON_RE = re.compile(r'''"baseURL"\s*:\s*"(?P<url>[^"]+)"''')
+BASEURL_LINE_RE = re.compile(r"""^\s*"?baseURL"?\s*[:=]""", re.IGNORECASE)
 EXTERNAL_CDN_URL_RE = re.compile(
     r"""(?P<url>(?:https?:)?//(?:(?:cdn|ajax|maxcdn|stackpath)\.[^/"'`\s<>)]*|cdn\.jsdelivr\.net|unpkg\.com|cdnjs\.cloudflare\.com|fonts\.googleapis\.com|fonts\.gstatic\.com|ajax\.googleapis\.com|maxcdn\.bootstrapcdn\.com|stackpath\.bootstrapcdn\.com)[^"'`\s<>)]*)""",
     re.IGNORECASE,
@@ -782,10 +783,45 @@ def config_and_front_matter_texts(theme_dir: Path) -> dict[Path, str]:
     return texts
 
 
+def is_config_path(path: Path) -> bool:
+    lower_name = path.name.lower()
+    return lower_name in {name.rsplit("/", 1)[-1] for name in CONFIG_FILES + CONFIG_DIR_FILES}
+
+
+def line_at_offset(text: str, offset: int) -> str:
+    start = text.rfind("\n", 0, offset) + 1
+    end = text.find("\n", offset)
+    if end == -1:
+        end = len(text)
+    return text[start:end]
+
+
+def is_baseurl_config_match(path: Path, text: str, offset: int) -> bool:
+    return is_config_path(path) and bool(BASEURL_LINE_RE.match(line_at_offset(text, offset)))
+
+
+def markdown_link_texts(theme_dir: Path) -> dict[Path, str]:
+    texts: dict[Path, str] = {}
+    for root in (theme_dir / "archetypes", theme_dir / "exampleSite" / "content"):
+        if not root.exists():
+            continue
+        for path in root.rglob("*.md"):
+            text = read_text_if_possible(path)
+            if text:
+                texts[path] = "\n".join(match.group(1) for match in MARKDOWN_LINK_RE.finditer(text))
+    return texts
+
+
 def check_subpath_safe_user_paths(result: dict, theme_dir: Path) -> None:
     warnings = 0
-    for path, text in config_and_front_matter_texts(theme_dir).items():
+    texts = config_and_front_matter_texts(theme_dir)
+    for path, text in markdown_link_texts(theme_dir).items():
+        if text:
+            texts[path] = "\n".join(filter(None, [texts.get(path), text]))
+    for path, text in texts.items():
         for match in ROOT_RELATIVE_URL_RE.finditer(text):
+            if is_baseurl_config_match(path, text, match.start()):
+                continue
             url_path = match.group("path")
             add(
                 result,
