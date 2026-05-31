@@ -439,11 +439,14 @@ class HugoThemeCheckTests(unittest.TestCase):
 
             self.assertEqual(result["warnings"], [])
 
-    def test_subpath_safe_user_paths_warns_for_root_relative_images(self) -> None:
+    def test_subpath_safe_user_paths_warns_for_root_relative_urls(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             theme = Path(tmp)
             (theme / "exampleSite" / "content").mkdir(parents=True)
-            (theme / "README.md").write_text("Set `heroImage = \"/images/hero.jpg\"`.\n", encoding="utf-8")
+            (theme / "README.md").write_text(
+                "Set `heroImage = \"/images/hero.jpg\"` and `tagsURL = \"/en/tags/\"`.\n",
+                encoding="utf-8",
+            )
             (theme / "exampleSite" / "content" / "_index.md").write_text(
                 "---\nheroImage: /images/about.png\n---\nBody /images/body.png\n",
                 encoding="utf-8",
@@ -453,27 +456,30 @@ class HugoThemeCheckTests(unittest.TestCase):
             hugo_theme_check.check_subpath_safe_user_paths(result, theme)
 
             messages = [warning["message"] for warning in result["warnings"]]
-            self.assertEqual(len(messages), 2)
+            self.assertEqual(len(messages), 3)
             self.assertTrue(all("root-relative" in message for message in messages))
+            self.assertTrue(any("/en/tags/" in message for message in messages))
 
-    def test_template_root_image_url_pipes_warns_for_relurl_inputs(self) -> None:
+    def test_template_root_url_helpers_warn_for_root_relative_inputs(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             theme = Path(tmp)
             (theme / "layouts" / "_partials").mkdir(parents=True)
             (theme / "layouts" / "_partials" / "hero.html").write_text(
                 '<img src="{{ "/images/hero.jpg" | relURL }}" alt="">\n'
+                '<a href="{{ relLangURL "/en/tags/" }}">Tags</a>\n'
                 '<img src="{{ `images/ok.jpg` | relURL }}" alt="">\n',
                 encoding="utf-8",
             )
             result = {"warnings": [], "info": [], "errors": []}
 
-            hugo_theme_check.check_template_root_image_url_pipes(result, theme)
+            hugo_theme_check.check_template_root_url_helpers(result, theme)
 
-            self.assertEqual(len(result["warnings"]), 1)
-            self.assertIn("root-relative image path", result["warnings"][0]["message"])
-            self.assertIn("/images/hero.jpg", result["warnings"][0]["message"])
+            messages = [warning["message"] for warning in result["warnings"]]
+            self.assertEqual(len(messages), 2)
+            self.assertTrue(any("/images/hero.jpg" in message and "relURL" in message for message in messages))
+            self.assertTrue(any("/en/tags/" in message and "relLangURL" in message for message in messages))
 
-    def test_subpath_build_output_assets_warns_for_root_relative_assets(self) -> None:
+    def test_subpath_build_output_warns_for_root_relative_assets_and_internal_links(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             destination = Path(tmp)
             (destination / "posts").mkdir()
@@ -486,9 +492,52 @@ class HugoThemeCheckTests(unittest.TestCase):
             hugo_theme_check.check_subpath_build_output_assets(result, destination)
 
             messages = [warning["message"] for warning in result["warnings"]]
-            self.assertEqual(len(messages), 2)
+            self.assertEqual(len(messages), 3)
             self.assertTrue(any('href="/css/site.css"' in message for message in messages))
             self.assertTrue(any('src="/images/hero.webp"' in message for message in messages))
+            self.assertTrue(any('href="/posts/"' in message for message in messages))
+
+    def test_theme_head_external_cdns_warns_for_cdn_assets(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            theme = Path(tmp)
+            (theme / "layouts" / "_partials").mkdir(parents=True)
+            (theme / "layouts" / "_partials" / "head.html").write_text(
+                '<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/demo/demo.css">\n'
+                '<script src="//unpkg.com/demo/demo.js"></script>\n'
+                '<meta property="og:url" content="https://example.com/">\n',
+                encoding="utf-8",
+            )
+            result = {"warnings": [], "info": [], "errors": []}
+
+            hugo_theme_check.check_theme_head_external_cdns(result, theme)
+
+            messages = [warning["message"] for warning in result["warnings"]]
+            self.assertEqual(len(messages), 2)
+            self.assertTrue(any("cdn.jsdelivr.net" in message for message in messages))
+            self.assertTrue(any("unpkg.com" in message for message in messages))
+
+    def test_example_site_baseurl_warns_unless_example_com(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            theme = Path(tmp)
+            (theme / "exampleSite").mkdir()
+            (theme / "exampleSite" / "hugo.toml").write_text('baseURL = "https://example.org/blog/"\n', encoding="utf-8")
+            result = {"warnings": [], "info": [], "errors": []}
+
+            hugo_theme_check.check_example_site_baseurl(result, theme)
+
+            self.assertEqual(len(result["warnings"]), 1)
+            self.assertIn("https://example.com/", result["warnings"][0]["message"])
+
+    def test_example_site_baseurl_accepts_example_com(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            theme = Path(tmp)
+            (theme / "exampleSite").mkdir()
+            (theme / "exampleSite" / "hugo.yaml").write_text("baseURL: https://example.com/\n", encoding="utf-8")
+            result = {"warnings": [], "info": [], "errors": []}
+
+            hugo_theme_check.check_example_site_baseurl(result, theme)
+
+            self.assertEqual(result["warnings"], [])
 
     def test_demo_social_links_warns_for_suspicious_demo_profiles(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
@@ -626,8 +675,8 @@ class HugoThemeCheckTests(unittest.TestCase):
         payload = json.loads(buffer.getvalue())
         self.assertEqual(code, 0)
         messages = [warning["message"] for warning in payload["warnings"]]
-        self.assertTrue(any("user-facing image path" in message for message in messages))
-        self.assertTrue(any("template pipes root-relative image path" in message for message in messages))
+        self.assertTrue(any("user-facing URL" in message for message in messages))
+        self.assertTrue(any("template passes root-relative URL" in message for message in messages))
 
     def test_publication_warns_about_theme_root_build_artifacts(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:

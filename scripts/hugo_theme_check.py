@@ -151,16 +151,28 @@ TELEGRAM_IV_IMAGE_FALLBACK_HINTS = (
 )
 SUBPATH_BASEURL = "https://example.org/blog/"
 DEMO_ASSET_SIZE_LIMIT = 1 * 1024 * 1024
-USER_ROOT_IMAGE_PATH_RE = re.compile(
-    r"""(?<![A-Za-z0-9:+.-])/(images/[^"'`\s)\]}>,]+?\.(?:avif|gif|jpe?g|png|svg|webp))""",
+ROOT_RELATIVE_URL_RE = re.compile(
+    r"""(?<![A-Za-z0-9:+.-])(?P<path>/(?!/|#)[A-Za-z0-9][A-Za-z0-9._~!$&'()*+,;=:@%/\-]*(?:\?[A-Za-z0-9._~!$&'()*+,;=:@%/?\-]*)?)""",
     re.IGNORECASE,
 )
-ROOT_IMAGE_URL_PIPE_RE = re.compile(
-    r"""(?P<quote>["'`])(?P<path>/images/[^"'`\s)]+\.(?:avif|gif|jpe?g|png|svg|webp))(?P=quote)\s*\|\s*(?:relURL|absURL)\b""",
+ROOT_RELATIVE_URL_PIPE_RE = re.compile(
+    r"""(?P<quote>["'`])(?P<path>/(?!/|#)[^"'`\s)]+)(?P=quote)\s*\|\s*(?P<helper>relURL|relLangURL|absURL|absLangURL)\b""",
     re.IGNORECASE,
 )
-ROOT_RELATIVE_ASSET_ATTR_RE = re.compile(
-    r"""\b(?P<attr>href|src)\s*=\s*(?P<quote>["'])(?P<path>/[^"'#?]+\.(?:avif|css|gif|ico|jpe?g|js|mjs|png|svg|webp))(?:[?#][^"']*)?(?P=quote)""",
+ROOT_RELATIVE_URL_FUNCTION_RE = re.compile(
+    r"""\b(?P<helper>relURL|relLangURL|absURL|absLangURL)\s+(?P<quote>["'`])(?P<path>/(?!/|#)[^"'`\s)]+)(?P=quote)""",
+    re.IGNORECASE,
+)
+ROOT_RELATIVE_ATTR_RE = re.compile(
+    r"""\b(?P<attr>href|src)\s*=\s*(?P<quote>["'])(?P<path>/(?!/|#)[^"']+?)(?P=quote)""",
+    re.IGNORECASE,
+)
+ASSET_URL_SUFFIX_RE = re.compile(r"""\.(?:avif|css|gif|ico|jpe?g|js|mjs|png|svg|webp)(?:[?#].*)?$""", re.IGNORECASE)
+EXAMPLE_SITE_BASEURL = "https://example.com/"
+BASEURL_TOML_YAML_RE = re.compile(r"""(?im)^\s*baseURL\s*[:=]\s*["']?(?P<url>[^"'\s#]+)""")
+BASEURL_JSON_RE = re.compile(r'''"baseURL"\s*:\s*"(?P<url>[^"]+)"''')
+EXTERNAL_CDN_URL_RE = re.compile(
+    r"""(?P<url>(?:https?:)?//(?:(?:cdn|ajax|maxcdn|stackpath)\.[^/"'`\s<>)]*|cdn\.jsdelivr\.net|unpkg\.com|cdnjs\.cloudflare\.com|fonts\.googleapis\.com|fonts\.gstatic\.com|ajax\.googleapis\.com|maxcdn\.bootstrapcdn\.com|stackpath\.bootstrapcdn\.com)[^"'`\s<>)]*)""",
     re.IGNORECASE,
 )
 SAFEHTML_INNER_PIPELINE_RE = re.compile(r"""\.Inner(?:\s*\|\s*[\w.]+)*\s*\|\s*safeHTML""")
@@ -773,33 +785,117 @@ def config_and_front_matter_texts(theme_dir: Path) -> dict[Path, str]:
 def check_subpath_safe_user_paths(result: dict, theme_dir: Path) -> None:
     warnings = 0
     for path, text in config_and_front_matter_texts(theme_dir).items():
-        for match in USER_ROOT_IMAGE_PATH_RE.finditer(text):
+        for match in ROOT_RELATIVE_URL_RE.finditer(text):
+            url_path = match.group("path")
             add(
                 result,
                 "warnings",
-                f"Publication check: user-facing image path '/{match.group(1)}' is root-relative. Prefer 'images/...' in README/config/front matter so deployments under subpaths work.",
+                f"Publication check: user-facing URL '{url_path}' is root-relative. Prefer relative paths such as 'images/...' or 'posts/...' in README/config/front matter so deployments under subpaths work.",
                 path,
             )
             warnings += 1
             if warnings >= 8:
-                add(result, "info", "Skipped additional root-relative user image path warnings after first 8 matches")
+                add(result, "info", "Skipped additional root-relative user URL warnings after first 8 matches")
                 return
 
 
-def check_template_root_image_url_pipes(result: dict, theme_dir: Path) -> None:
+def check_template_root_url_helpers(result: dict, theme_dir: Path) -> None:
     warnings = 0
     for path, text in collect_text_from_roots([theme_dir / "layouts", theme_dir / "assets"]).items():
-        for match in ROOT_IMAGE_URL_PIPE_RE.finditer(text):
+        matches = list(ROOT_RELATIVE_URL_PIPE_RE.finditer(text)) + list(ROOT_RELATIVE_URL_FUNCTION_RE.finditer(text))
+        for match in matches:
             add(
                 result,
                 "warnings",
-                f"Publication check: template pipes root-relative image path '{match.group('path')}' through relURL/absURL. Prefer a relative path or trim the leading slash before URL helpers.",
+                f"Publication check: template passes root-relative URL '{match.group('path')}' to {match.group('helper')}. Prefer a relative path or trim the leading slash before URL helpers.",
                 path,
             )
             warnings += 1
             if warnings >= 8:
-                add(result, "info", "Skipped additional template root-relative image URL helper warnings after first 8 matches")
+                add(result, "info", "Skipped additional template root-relative URL helper warnings after first 8 matches")
                 return
+
+
+def is_theme_owned_head_path(path: Path) -> bool:
+    lower_name = path.name.lower()
+    lower_stem = path.stem.lower()
+    return lower_stem == "head" or lower_name in {"baseof.html", "base.html", "index.html", "home.html"}
+
+
+def head_owned_text(path: Path, text: str) -> str:
+    if path.stem.lower() == "head":
+        return text
+    lower = text.lower()
+    start = lower.find("<head")
+    if start == -1:
+        return ""
+    end = lower.find("</head>", start)
+    if end == -1:
+        return text[start:]
+    return text[start : end + len("</head>")]
+
+
+def check_theme_head_external_cdns(result: dict, theme_dir: Path) -> None:
+    warnings = 0
+    for path, text in collect_text_from_roots([theme_dir / "layouts"]).items():
+        if not is_theme_owned_head_path(path):
+            continue
+        head_text = head_owned_text(path, text)
+        if not head_text:
+            continue
+        for match in EXTERNAL_CDN_URL_RE.finditer(head_text):
+            add(
+                result,
+                "warnings",
+                f"Publication check: theme-owned head references external CDN asset '{match.group('url')}'. Prefer vendored theme assets or Hugo Pipes; avoid protocol-relative CDN URLs.",
+                path,
+            )
+            warnings += 1
+            if warnings >= 8:
+                add(result, "info", "Skipped additional external CDN head warnings after first 8 matches")
+                return
+
+
+def example_site_config_paths(theme_dir: Path) -> list[Path]:
+    example_site = theme_dir / "exampleSite"
+    return [example_site / name for name in CONFIG_FILES + CONFIG_DIR_FILES if (example_site / name).exists()]
+
+
+def extract_baseurl(text: str) -> str | None:
+    for pattern in (BASEURL_JSON_RE, BASEURL_TOML_YAML_RE):
+        match = pattern.search(text)
+        if match:
+            return match.group("url").strip()
+    return None
+
+
+def is_example_site_baseurl(value: str) -> bool:
+    return value.rstrip("/") == EXAMPLE_SITE_BASEURL.rstrip("/")
+
+
+def check_example_site_baseurl(result: dict, theme_dir: Path) -> None:
+    example_site = theme_dir / "exampleSite"
+    if not example_site.exists():
+        return
+    config_paths = example_site_config_paths(theme_dir)
+    if not config_paths:
+        add(result, "warnings", f"Publication check: exampleSite should set baseURL to {EXAMPLE_SITE_BASEURL}")
+        return
+    saw_baseurl = False
+    for path in config_paths:
+        baseurl = extract_baseurl(read_text_if_possible(path))
+        if baseurl is None:
+            continue
+        saw_baseurl = True
+        if not is_example_site_baseurl(baseurl):
+            add(
+                result,
+                "warnings",
+                f"Publication check: exampleSite baseURL is '{baseurl}'. Use {EXAMPLE_SITE_BASEURL} for themes.gohugo.io examples.",
+                path,
+            )
+    if not saw_baseurl:
+        add(result, "warnings", f"Publication check: exampleSite should set baseURL to {EXAMPLE_SITE_BASEURL}")
 
 
 def check_demo_social_links(result: dict, theme_dir: Path) -> None:
@@ -896,16 +992,22 @@ def check_subpath_build_output_assets(result: dict, destination: Path) -> None:
         text = read_text_if_possible(path)
         if not text:
             continue
-        for match in ROOT_RELATIVE_ASSET_ATTR_RE.finditer(text):
+        for match in ROOT_RELATIVE_ATTR_RE.finditer(text):
+            attr = match.group("attr").lower()
+            url_path = match.group("path")
+            is_asset = bool(ASSET_URL_SUFFIX_RE.search(url_path))
+            if attr != "href" and not is_asset:
+                continue
+            label = "asset URL" if is_asset else "internal link"
             add(
                 result,
                 "warnings",
-                f"Publication check: subpath build output contains root-relative asset {match.group('attr')}=\"{match.group('path')}\". Use relURL/absURL with relative inputs or page/resource URLs.",
+                f"Publication check: subpath build output contains root-relative {label} {match.group('attr')}=\"{url_path}\". Use relURL/relLangURL with relative inputs, absURL only where absolute URLs are intentional, or page/resource URLs.",
                 path,
             )
             warnings += 1
             if warnings >= 8:
-                add(result, "info", "Skipped additional subpath output root-relative asset warnings after first 8 matches")
+                add(result, "info", "Skipped additional subpath output root-relative URL warnings after first 8 matches")
                 return
 
 
@@ -1005,7 +1107,9 @@ def main() -> int:
             check_footer_theme_attribution(result, theme_dir)
             check_telegram_instant_view(result, theme_dir)
             check_subpath_safe_user_paths(result, theme_dir)
-            check_template_root_image_url_pipes(result, theme_dir)
+            check_template_root_url_helpers(result, theme_dir)
+            check_theme_head_external_cdns(result, theme_dir)
+            check_example_site_baseurl(result, theme_dir)
             check_demo_social_links(result, theme_dir)
             check_demo_asset_sizes(result, theme_dir)
             check_safe_code_render_hooks(result, theme_dir)

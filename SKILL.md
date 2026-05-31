@@ -59,7 +59,7 @@ For reusable packages, keep demos neutral: a fictional person/studio/lab/product
 
 ## Production Readiness
 
-For quick design tests, keep the theme focused and small. For GitHub/themes.gohugo.io publication, read `references/hugo-theme-notes.md` and add the expected package surface: README, license, theme metadata, richer `exampleSite`, preview images, favicon/webmanifest when the theme owns `<head>`, 404/RSS, responsive navigation, code styles, footer theme attribution, documented params, and subpath-safe assets.
+For quick design tests, keep the theme focused and small. For GitHub/themes.gohugo.io publication, read `references/hugo-theme-notes.md` and add the expected package surface: README, license, theme metadata, richer `exampleSite`, preview images, favicon/webmanifest when the theme owns `<head>`, 404/RSS, responsive navigation, code styles, footer theme attribution, documented params, subpath-safe internal links/assets, and no CDN dependencies in theme-owned head output.
 
 Do not confuse a visually plausible prototype with a reusable theme product. When the user compares against a mature human-made theme or plans to publish the result, graduate the implementation beyond screenshot matching:
 - replace decorative or placeholder UI with working Hugo behavior, or remove controls that are only visual;
@@ -67,7 +67,7 @@ Do not confuse a visually plausible prototype with a reusable theme product. Whe
 - use real icon assets or an icon partial instead of unicode stand-ins for reusable theme UI;
 - make post images robust with page resources/static assets and resizing where practical;
 - make prominent theme images replaceable. Do not hard-code hero, avatar, about, profile, or social preview paths such as `/images/specific-person.jpg` directly into templates as the only source. Read them from `params`, front matter, page resources, or data files with documented fallback defaults, for example `params.heroImage`, `params.aboutImage`, `params.avatar`, and `params.images`;
-- keep user-facing paths subpath-safe. In README examples, config params, archetypes, and front matter prefer `images/foo.jpg` over `/images/foo.jpg`; when template code receives a user path before `relURL` or `absURL`, normalize accidental leading slashes so a non-root `baseURL` such as `https://example.org/blog/` still works;
+- keep user-facing URLs subpath-safe. In README examples, config params, archetypes, and front matter prefer `images/foo.jpg`, `posts/foo/`, and `tags/news/` over `/images/foo.jpg`, `/posts/foo/`, and `/tags/news/`; when template code receives a user path before `relURL`, `relLangURL`, `absURL`, or `absLangURL`, normalize accidental leading slashes so a non-root `baseURL` such as `https://example.org/blog/` still works;
 - add an unobtrusive publication footer attribution for reusable themes, separate from site author/copyright: `Theme <ThemeName> by <ThemeAuthor>.` Enable it by default, make it disableable through `params.footer.showThemeAttribution`, localize the sentence through i18n, support separate `themeURL` and `themeAuthorURL`, and document the params in README;
 - add search, comments, PWA, i18n, analytics, or shortcodes only when requested or implied, but make advertised features actually work;
 - generate preview screenshots from the rendered theme when a browser screenshot tool is available instead of drawing schematic placeholder previews.
@@ -159,7 +159,7 @@ python3 scripts/hugo_theme_check.py --theme-dir /path/to/theme --publication
 python3 scripts/hugo_theme_check.py --theme-dir /path/to/theme --mode port --publication
 ```
 
-The checker emits JSON with `errors`, `warnings`, `info`, and `ok`. Use default `--mode new` for generated variants with `exampleSite`; use `--mode port` for known-theme ports. Add `--publication` for GitHub/public packages. It warns about preview dimensions/pixel sanity, empty partials, missing package surface, subpath build failures and root-relative asset output, root-relative user/template image paths, fake demo socials, oversized demo PNG/JPG assets, and unsafe code render hooks. Still run Hugo and inspect the rendered site for visual quality.
+The checker emits JSON with `errors`, `warnings`, `info`, and `ok`. Use default `--mode new` for generated variants with `exampleSite`; use `--mode port` for known-theme ports. Add `--publication` for GitHub/public packages. It warns about preview dimensions/pixel sanity, empty partials, missing package surface, subpath build failures and root-relative internal link/asset output, root-relative user/template URLs, external CDN references in theme-owned head output, nonstandard `exampleSite` `baseURL`, fake demo socials, oversized demo PNG/JPG assets, and unsafe code render hooks. Still run Hugo and inspect the rendered site for visual quality.
 
 For skill development, run the bundled unit tests after changing scripts:
 
