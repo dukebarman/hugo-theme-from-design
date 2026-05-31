@@ -44,5 +44,5 @@ For ports/reimplementations of known themes, preserve upstream package conventio
 - Did `hugo new theme` leave sample Markdown in root `content/` that should be moved to `exampleSite/content/` or removed?
 - Are `exampleSite/public/` and `.hugo_build.lock` absent from the source deliverable?
 - Are authoring-facing params documented through sample config or README, not buried in templates?
-- If intended for GitHub/public release, are README, LICENSE, screenshots, 404/RSS, favicon/webmanifest, mobile navigation, code styling, and documented params present?
+- If intended for GitHub/public release, are README, LICENSE, screenshots, 404/RSS, favicon/webmanifest, mobile navigation, code styling, footer theme attribution, and documented params present?
 - Does the theme work under a non-root `baseURL` using relative/permalink-safe asset paths?

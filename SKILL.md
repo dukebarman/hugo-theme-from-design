@@ -83,7 +83,7 @@ Keep generated demo content credible but lightweight. Do not put built output su
 
 ## Production Readiness
 
-For quick design tests, keep the theme focused and small. For a publishable GitHub theme or a theme intended for `themes.gohugo.io`, read the production checklist in `references/hugo-theme-notes.md` and add the expected package surface: README, license, richer `exampleSite`, favicon/webmanifest assets, 404/RSS/templates, responsive mobile navigation, code styles when posts include code, and documented params.
+For quick design tests, keep the theme focused and small. For a publishable GitHub theme or a theme intended for `themes.gohugo.io`, read the production checklist in `references/hugo-theme-notes.md` and add the expected package surface: README, license, richer `exampleSite`, favicon/webmanifest assets, 404/RSS/templates, responsive mobile navigation, code styles when posts include code, footer theme attribution, and documented params.
 
 Do not confuse a visually plausible prototype with a reusable theme product. When the user compares against a mature human-made theme or plans to publish the result, graduate the implementation beyond screenshot matching:
 - replace decorative or placeholder UI with working Hugo behavior, or remove controls that are only visual;
@@ -91,6 +91,7 @@ Do not confuse a visually plausible prototype with a reusable theme product. Whe
 - use real icon assets or an icon partial instead of unicode stand-ins for reusable theme UI;
 - make post images robust with page resources/static assets and resizing where practical;
 - make prominent theme images replaceable. Do not hard-code hero, avatar, about, profile, or social preview paths such as `/images/specific-person.jpg` directly into templates as the only source. Read them from `params`, front matter, page resources, or data files with documented fallback defaults, for example `params.heroImage`, `params.aboutImage`, `params.avatar`, and `params.images`;
+- add an unobtrusive publication footer attribution for reusable themes, separate from site author/copyright: `Theme <ThemeName> by <ThemeAuthor>.` Enable it by default, make it disableable through `params.footer.showThemeAttribution`, localize the sentence through i18n, support separate `themeURL` and `themeAuthorURL`, and document the params in README;
 - add search, comments, PWA, i18n, analytics, or shortcodes only when requested or implied, but make advertised features actually work;
 - generate preview screenshots from the rendered theme when a browser screenshot tool is available instead of drawing schematic placeholder previews.
 

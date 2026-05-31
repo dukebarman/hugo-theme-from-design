@@ -239,6 +239,60 @@ class HugoThemeCheckTests(unittest.TestCase):
 
             self.assertEqual(result["warnings"], [])
 
+    def test_footer_theme_attribution_accepts_publication_contract(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            theme = Path(tmp)
+            (theme / "layouts" / "_partials").mkdir(parents=True)
+            (theme / "i18n").mkdir()
+            (theme / "exampleSite").mkdir()
+            (theme / "layouts" / "_partials" / "footer.html").write_text(
+                "{{ with .Site.Params.footer }}{{ if .showThemeAttribution }}{{ i18n \"themeAttribution\" . }}{{ end }}{{ end }}\n",
+                encoding="utf-8",
+            )
+            (theme / "i18n" / "en.toml").write_text(
+                "[themeAttribution]\nother = 'Theme {{ .themeName }} by {{ .themeAuthorName }}.'\n",
+                encoding="utf-8",
+            )
+            (theme / "exampleSite" / "hugo.toml").write_text(
+                "\n".join(
+                    [
+                        "[params.footer]",
+                        "showCopyright = true",
+                        "showHugoAttribution = true",
+                        "showThemeAttribution = true",
+                        "themeName = 'Demo'",
+                        "themeURL = 'https://example.org/theme'",
+                        "themeAuthorName = 'Author'",
+                        "themeAuthorURL = 'https://example.org/author'",
+                    ]
+                ),
+                encoding="utf-8",
+            )
+            (theme / "README.md").write_text(
+                "Set `params.footer.showCopyright`, `showHugoAttribution`, `showThemeAttribution`, `themeName`, `themeURL`, `themeAuthorName`, and `themeAuthorURL`.\n",
+                encoding="utf-8",
+            )
+            result = {"warnings": [], "info": [], "errors": []}
+
+            hugo_theme_check.check_footer_theme_attribution(result, theme)
+
+            self.assertEqual(result["warnings"], [])
+
+    def test_footer_theme_attribution_warns_when_missing(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            theme = Path(tmp)
+            (theme / "layouts" / "_partials").mkdir(parents=True)
+            (theme / "layouts" / "_partials" / "footer.html").write_text("<footer>Demo</footer>\n", encoding="utf-8")
+            result = {"warnings": [], "info": [], "errors": []}
+
+            hugo_theme_check.check_footer_theme_attribution(result, theme)
+
+            messages = [warning["message"] for warning in result["warnings"]]
+            self.assertTrue(any("missing footer theme attribution params" in message for message in messages))
+            self.assertTrue(any("README should document" in message for message in messages))
+            self.assertTrue(any("localizable through i18n" in message for message in messages))
+            self.assertTrue(any("layouts should render" in message for message in messages))
+
     def test_publication_warns_about_theme_root_build_artifacts(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             theme = Path(tmp)
