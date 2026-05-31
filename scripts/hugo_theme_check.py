@@ -74,6 +74,7 @@ TEXT_FILE_SUFFIXES = {
     ".scss",
     ".sass",
     ".toml",
+    ".tpl",
     ".ts",
     ".yaml",
     ".yml",
@@ -94,6 +95,33 @@ FOOTER_ATTRIBUTION_I18N_HINTS = (
     "theme_attribution",
     "footerThemeAttribution",
     "footer_theme_attribution",
+)
+TELEGRAM_IV_TEMPLATE = "docs/telegram-instant-view.tpl"
+TELEGRAM_IV_README_RE = re.compile(r"\b(?:telegram\s+instant\s+view|telegram\s+iv|instant\s+view)\b", re.IGNORECASE)
+TELEGRAM_IV_AUTO_TERMS = (
+    "automatic",
+    "automatically",
+    "auto-enabled",
+    "auto enabled",
+    "out of the box",
+    "just works",
+)
+TELEGRAM_IV_DOMAIN_TERMS = (
+    "per-domain",
+    "per domain",
+    "live domain",
+    "domain-specific",
+    "telegram editor",
+    "telegram's editor",
+    "instant view editor",
+)
+TELEGRAM_IV_IMAGE_FALLBACK_HINTS = (
+    ".Params.images",
+    ".Params.cover",
+    ".Param \"images\"",
+    ".Param \"cover\"",
+    "params.images",
+    "params.cover",
 )
 
 
@@ -518,6 +546,72 @@ def check_footer_theme_attribution(result: dict, theme_dir: Path) -> None:
         add(result, "warnings", "Publication check: layouts should render footer theme attribution behind params.footer.showThemeAttribution")
 
 
+def readme_texts(theme_dir: Path) -> dict[Path, str]:
+    texts: dict[Path, str] = {}
+    for name in README_FILES:
+        path = theme_dir / name
+        if path.exists():
+            text = read_text_if_possible(path)
+            if text:
+                texts[path] = text
+    return texts
+
+
+def declares_telegram_instant_view(theme_dir: Path) -> bool:
+    if (theme_dir / TELEGRAM_IV_TEMPLATE).exists():
+        return True
+    return any(TELEGRAM_IV_README_RE.search(text) for text in readme_texts(theme_dir).values())
+
+
+def check_telegram_instant_view(result: dict, theme_dir: Path) -> None:
+    if not declares_telegram_instant_view(theme_dir):
+        return
+
+    implementation_roots = [
+        theme_dir / "layouts",
+        theme_dir / "assets",
+        theme_dir / "archetypes",
+    ]
+    implementation_texts = collect_text_from_roots(implementation_roots)
+    implementation_text = "\n".join(implementation_texts.values())
+    readme_text = "\n".join(readme_texts(theme_dir).values())
+    readme_lower = readme_text.lower()
+
+    selector_checks = {
+        "data-iv-article": "Telegram Instant View check: single article templates should expose article[data-iv-article]",
+        "iv-title": "Telegram Instant View check: article titles should expose a stable .iv-title selector",
+        "data-iv-published": "Telegram Instant View check: publish dates should expose [data-iv-published]",
+        "data-iv-content": "Telegram Instant View check: article bodies should expose [data-iv-content]",
+        "data-iv-remove": "Telegram Instant View check: removable UI chrome should be marked with [data-iv-remove]",
+    }
+    for needle, message in selector_checks.items():
+        if needle not in implementation_text:
+            add(result, "warnings", message)
+
+    metadata_checks = {
+        "og:type": "Telegram Instant View check: head metadata should include og:type for article pages",
+        "article:published_time": "Telegram Instant View check: head metadata should include article:published_time",
+    }
+    for needle, message in metadata_checks.items():
+        if needle not in implementation_text:
+            add(result, "warnings", message)
+
+    if "og:image" not in implementation_text and not any(hint in implementation_text for hint in TELEGRAM_IV_IMAGE_FALLBACK_HINTS):
+        add(result, "warnings", "Telegram Instant View check: head metadata should include og:image or documented image fallback logic")
+
+    if "instantview.telegram.org/docs" not in readme_lower and "instantview.telegram.org/checklist" not in readme_lower:
+        add(result, "warnings", "Telegram Instant View check: README should link to official Telegram Instant View documentation")
+
+    has_auto_claim = any(term in readme_lower for term in TELEGRAM_IV_AUTO_TERMS)
+    has_domain_context = any(term in readme_lower for term in TELEGRAM_IV_DOMAIN_TERMS)
+    if has_auto_claim and not has_domain_context:
+        add(
+            result,
+            "warnings",
+            "Telegram Instant View check: README should not describe IV as automatic without explaining per-domain Telegram template configuration",
+        )
+
+
 def detect_build_command(theme_dir: Path, site_dir: Path | None) -> tuple[Path, list[str]] | None:
     theme_name = theme_dir.name
     if site_dir is not None:
@@ -611,6 +705,7 @@ def main() -> int:
                 add(result, "warnings", "Publication check: no favicon or webmanifest asset detected")
             check_hardcoded_replaceable_images(result, theme_dir)
             check_footer_theme_attribution(result, theme_dir)
+            check_telegram_instant_view(result, theme_dir)
 
         root_content = theme_dir / "content"
         if root_content.exists():
