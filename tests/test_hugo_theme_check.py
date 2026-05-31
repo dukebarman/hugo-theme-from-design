@@ -293,6 +293,72 @@ class HugoThemeCheckTests(unittest.TestCase):
             self.assertTrue(any("localizable through i18n" in message for message in messages))
             self.assertTrue(any("layouts should render" in message for message in messages))
 
+    def test_telegram_instant_view_ignored_when_not_declared(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            theme = Path(tmp)
+            (theme / "layouts").mkdir()
+            result = {"warnings": [], "info": [], "errors": []}
+
+            hugo_theme_check.check_telegram_instant_view(result, theme)
+
+            self.assertEqual(result["warnings"], [])
+
+    def test_telegram_instant_view_warns_when_declared_but_incomplete(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            theme = Path(tmp)
+            (theme / "docs").mkdir()
+            (theme / "docs" / "telegram-instant-view.tpl").write_text("~version: \"2.1\"\n", encoding="utf-8")
+            (theme / "README.md").write_text("Instant View works automatically for articles.\n", encoding="utf-8")
+            result = {"warnings": [], "info": [], "errors": []}
+
+            hugo_theme_check.check_telegram_instant_view(result, theme)
+
+            messages = [warning["message"] for warning in result["warnings"]]
+            self.assertTrue(any("data-iv-article" in message for message in messages))
+            self.assertTrue(any("data-iv-content" in message for message in messages))
+            self.assertTrue(any("data-iv-remove" in message for message in messages))
+            self.assertTrue(any("og:type" in message for message in messages))
+            self.assertTrue(any("og:image" in message for message in messages))
+            self.assertTrue(any("article:published_time" in message for message in messages))
+            self.assertTrue(any("official Telegram Instant View documentation" in message for message in messages))
+            self.assertTrue(any("should not describe IV as automatic" in message for message in messages))
+
+    def test_telegram_instant_view_accepts_publication_contract(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            theme = Path(tmp)
+            (theme / "layouts" / "_default").mkdir(parents=True)
+            (theme / "docs").mkdir()
+            (theme / "layouts" / "_default" / "single.html").write_text(
+                "\n".join(
+                    [
+                        '<article data-iv-article>',
+                        '<h1 class="post-title iv-title">{{ .Title }}</h1>',
+                        '<time data-iv-published datetime="{{ .Date.Format "2006-01-02T15:04:05Z07:00" }}"></time>',
+                        '<figure data-iv-cover></figure>',
+                        '<div data-iv-content>{{ .Content }}</div>',
+                        '<aside data-iv-remove="true"></aside>',
+                        '<meta property="og:type" content="article">',
+                        '<meta property="og:image" content="{{ with .Params.images }}{{ index . 0 }}{{ end }}">',
+                        '<meta property="article:published_time" content="{{ .Date }}">',
+                        "</article>",
+                    ]
+                ),
+                encoding="utf-8",
+            )
+            (theme / "docs" / "telegram-instant-view.tpl").write_text(
+                "~version: \"2.1\"\n?exists: //article[@data-iv-article]\nbody: //*[@data-iv-content]\n",
+                encoding="utf-8",
+            )
+            (theme / "README.md").write_text(
+                "Telegram Instant View support prepares HTML and a sample template. Configure and validate it per live domain in Telegram's editor. See https://instantview.telegram.org/docs/.\n",
+                encoding="utf-8",
+            )
+            result = {"warnings": [], "info": [], "errors": []}
+
+            hugo_theme_check.check_telegram_instant_view(result, theme)
+
+            self.assertEqual(result["warnings"], [])
+
     def test_publication_warns_about_theme_root_build_artifacts(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             theme = Path(tmp)

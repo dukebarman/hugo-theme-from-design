@@ -85,6 +85,8 @@ Keep generated demo content credible but lightweight. Do not put built output su
 
 For quick design tests, keep the theme focused and small. For a publishable GitHub theme or a theme intended for `themes.gohugo.io`, read the production checklist in `references/hugo-theme-notes.md` and add the expected package surface: README, license, richer `exampleSite`, favicon/webmanifest assets, 404/RSS/templates, responsive mobile navigation, code styles when posts include code, footer theme attribution, and documented params.
 
+For publishable blog, magazine, documentation, or long-form article themes, make article pages friendly to external article renderers such as Telegram Instant View: stable article selectors, removable UI chrome markers, article metadata, cover support, figure captions, and code-block language metadata. Do not imply that Instant View is automatic; Telegram IV templates are configured and validated per live domain.
+
 Do not confuse a visually plausible prototype with a reusable theme product. When the user compares against a mature human-made theme or plans to publish the result, graduate the implementation beyond screenshot matching:
 - replace decorative or placeholder UI with working Hugo behavior, or remove controls that are only visual;
 - implement pagination with Hugo pagination APIs when lists can exceed one page;
@@ -96,6 +98,25 @@ Do not confuse a visually plausible prototype with a reusable theme product. Whe
 - generate preview screenshots from the rendered theme when a browser screenshot tool is available instead of drawing schematic placeholder previews.
 
 When generating demo assets for a publishable theme, keep prompts publication-safe: explicitly exclude real people, personal identifiers, readable text, logos, trademarks, and watermarks unless the user provided licensed assets and requested them. After generation, visually inspect the asset, regenerate if artifacts or prohibited details appear, then regenerate `images/screenshot.png` and `images/tn.png` from the rendered theme preview.
+
+## Telegram Instant View Support
+
+When the user asks for Telegram Instant View support, or when preparing a publishable article-focused theme where Telegram sharing matters:
+
+- Add stable selectors to single article templates, independent from visual CSS classes:
+  - `article[data-iv-article]`;
+  - `.iv-title`;
+  - `[data-iv-published]`;
+  - `[data-iv-content]`;
+  - optional `[data-iv-cover]`;
+  - `[data-iv-remove]` for nav, footer, share buttons, sidebars, related posts, graphs, comments, and other UI chrome.
+- Add article metadata in `head`: canonical URL, description, Open Graph article fields, `og:image`, `article:published_time`, `article:modified_time`, `article:author`, and optional JSON-LD `BlogPosting`.
+- Support front matter fields such as `author`, `authorURL`, `cover`, `coverAlt`, `coverCaption`, and `images`.
+- Add render hooks for Markdown images and code blocks when missing:
+  - images should render as `figure > img + figcaption` when captions exist;
+  - fenced code blocks should expose the language, for example `<pre data-language="go">`.
+- Include a sample `docs/telegram-instant-view.tpl`, or copy `assets/telegram-instant-view.tpl` from this skill when available. Adapt the `?path` rule to the live site's URL structure, such as `/posts/`, `/blog/`, `/articles/`, or `/docs/`.
+- Document that Telegram Instant View must be configured and validated per live domain in Telegram's editor. The theme prepares renderer-friendly HTML and an example template; it does not enable Instant View automatically.
 
 ## Hugo Implementation Rules
 
