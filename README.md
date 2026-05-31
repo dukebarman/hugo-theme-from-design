@@ -2,7 +2,7 @@
 
 Codex skill for creating, updating, and repairing Hugo themes from design references such as Figma frames, exported assets, screenshots, or existing Hugo theme repositories.
 
-The skill is aimed at turning a visual design into a reusable Hugo theme package, not just a static screenshot match. It guides Codex through theme scaffolding, `exampleSite` generation, Hugo build validation, preview image capture, and package-readiness checks for public theme repositories.
+The skill is aimed at turning a visual design into a reusable Hugo theme package, not just a static screenshot match. It guides Codex through theme scaffolding, `exampleSite` generation, Hugo build validation, preview image capture, and package-readiness checks for public theme repositories, including configurable footer attribution.
 
 ## When to use it
 

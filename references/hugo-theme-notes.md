@@ -22,6 +22,7 @@ For themes intended for `themes.gohugo.io`, check:
 - `images/tn.png` or `.jpg`, 3:2 ratio, minimum `900x600`;
 - preview images show the actual theme without browser/device mockups;
 - hero, avatar, about, profile, and social preview images are replaceable through params, front matter, page resources, or data files instead of being hard-coded to a real person or repository owner;
+- footer theme attribution is present, separate from site author/copyright, enabled by default, disableable through params, localized through i18n, and supports separate theme and theme-author URLs;
 - `exampleSite` demo content is neutral and reusable. Use a fictional person, studio, lab, product, venue, publication, or demo brand unless the requested deliverable is a real personal site;
 - if forked or ported, document why it is notably different and preserve original licensing requirements;
 - no paid-theme gating or README-as-advertisement for a paid variant.
@@ -48,6 +49,21 @@ For GitHub publication, also prefer:
 - code highlighting styles when sample posts include code;
 - documented params such as `mainSections`, `dateFormat`, `defaultColor`, author/avatar/social fields, footer, and optional analytics/comments.
 - publication-safe generated demo assets: no real people, personal identifiers, readable text, logos, trademarks, or watermarks unless supplied as licensed user assets.
+
+Recommended footer attribution config:
+
+```toml
+[params.footer]
+  showCopyright = true
+  showHugoAttribution = true
+  showThemeAttribution = true
+  themeName = "Theme Name"
+  themeURL = "https://github.com/author/theme"
+  themeAuthorName = "author"
+  themeAuthorURL = "https://example.com"
+```
+
+Render the theme attribution as an unobtrusive footer line such as `Theme <ThemeName> by <ThemeAuthor>.` Keep it visually and semantically separate from the site owner's copyright or author bio. Use i18n for the sentence pattern, link the theme name to `themeURL`, link the theme author to `themeAuthorURL`, and document the params in README so publication users can keep, localize, or disable the attribution intentionally.
 
 ## Prototype Vs Product
 

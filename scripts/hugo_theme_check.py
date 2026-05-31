@@ -68,13 +68,33 @@ TEXT_FILE_SUFFIXES = {
     ".css",
     ".html",
     ".js",
+    ".json",
     ".mjs",
+    ".md",
     ".scss",
     ".sass",
+    ".toml",
     ".ts",
+    ".yaml",
+    ".yml",
 }
 HARDCODED_IMAGE_PATH_RE = re.compile(r"""["'`](/images/[^"'`\s)]+\.(?:avif|jpe?g|png|webp))""", re.IGNORECASE)
 REPLACEABLE_IMAGE_HINTS = ("hero", "about", "avatar", "profile", "portrait", "headshot", "person", "author")
+FOOTER_ATTRIBUTION_KEYS = (
+    "showCopyright",
+    "showHugoAttribution",
+    "showThemeAttribution",
+    "themeName",
+    "themeURL",
+    "themeAuthorName",
+    "themeAuthorURL",
+)
+FOOTER_ATTRIBUTION_I18N_HINTS = (
+    "themeAttribution",
+    "theme_attribution",
+    "footerThemeAttribution",
+    "footer_theme_attribution",
+)
 
 
 def add(result: dict, level: str, message: str, path: Path | None = None) -> None:
@@ -427,6 +447,77 @@ def check_hardcoded_replaceable_images(result: dict, theme_dir: Path) -> None:
                     return
 
 
+def read_text_if_possible(path: Path) -> str:
+    try:
+        return path.read_text(encoding="utf-8")
+    except (UnicodeDecodeError, OSError):
+        return ""
+
+
+def collect_text_from_roots(roots: list[Path]) -> dict[Path, str]:
+    texts: dict[Path, str] = {}
+    for root in roots:
+        if not root.exists():
+            continue
+        if root.is_file():
+            if root.suffix.lower() in TEXT_FILE_SUFFIXES or root.name in README_FILES:
+                text = read_text_if_possible(root)
+                if text:
+                    texts[root] = text
+            continue
+        for path in root.rglob("*"):
+            if not path.is_file():
+                continue
+            if path.suffix.lower() not in TEXT_FILE_SUFFIXES and path.name not in README_FILES:
+                continue
+            text = read_text_if_possible(path)
+            if text:
+                texts[path] = text
+    return texts
+
+
+def check_footer_theme_attribution(result: dict, theme_dir: Path) -> None:
+    roots = [
+        theme_dir / "layouts",
+        theme_dir / "i18n",
+        theme_dir / "README.md",
+        theme_dir / "README.markdown",
+        theme_dir / "README",
+        theme_dir / "hugo.toml",
+        theme_dir / "config.toml",
+        theme_dir / "config",
+        theme_dir / "exampleSite" / "hugo.toml",
+        theme_dir / "exampleSite" / "config.toml",
+        theme_dir / "exampleSite" / "config",
+    ]
+    texts = collect_text_from_roots(roots)
+    implementation_text = "\n".join(text for path, text in texts.items() if path.name not in README_FILES)
+
+    missing_keys = [key for key in FOOTER_ATTRIBUTION_KEYS if key not in implementation_text]
+    if missing_keys:
+        add(
+            result,
+            "warnings",
+            "Publication check: missing footer theme attribution params: " + ", ".join(missing_keys),
+        )
+
+    readme_text = "\n".join(text for path, text in texts.items() if path.name in README_FILES)
+    missing_readme_keys = [key for key in FOOTER_ATTRIBUTION_KEYS if key not in readme_text]
+    if missing_readme_keys:
+        add(
+            result,
+            "warnings",
+            "Publication check: README should document footer theme attribution params: " + ", ".join(missing_readme_keys),
+        )
+
+    i18n_text = "\n".join(text for path, text in texts.items() if "i18n" in path.parts)
+    layout_text = "\n".join(text for path, text in texts.items() if "layouts" in path.parts)
+    if not any(hint in i18n_text for hint in FOOTER_ATTRIBUTION_I18N_HINTS):
+        add(result, "warnings", "Publication check: footer theme attribution sentence should be localizable through i18n")
+    if "showThemeAttribution" not in layout_text:
+        add(result, "warnings", "Publication check: layouts should render footer theme attribution behind params.footer.showThemeAttribution")
+
+
 def detect_build_command(theme_dir: Path, site_dir: Path | None) -> tuple[Path, list[str]] | None:
     theme_name = theme_dir.name
     if site_dir is not None:
@@ -519,6 +610,7 @@ def main() -> int:
             if not any_exists(theme_dir, FAVICON_CANDIDATES):
                 add(result, "warnings", "Publication check: no favicon or webmanifest asset detected")
             check_hardcoded_replaceable_images(result, theme_dir)
+            check_footer_theme_attribution(result, theme_dir)
 
         root_content = theme_dir / "content"
         if root_content.exists():
