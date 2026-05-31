@@ -64,6 +64,17 @@ CONTENT_ASSET_SUFFIXES = {
     ".webp",
     ".zip",
 }
+TEXT_FILE_SUFFIXES = {
+    ".css",
+    ".html",
+    ".js",
+    ".mjs",
+    ".scss",
+    ".sass",
+    ".ts",
+}
+HARDCODED_IMAGE_PATH_RE = re.compile(r"""["'`](/images/[^"'`\s)]+\.(?:avif|jpe?g|png|webp))""", re.IGNORECASE)
+REPLACEABLE_IMAGE_HINTS = ("hero", "about", "avatar", "profile", "portrait", "headshot", "person", "author")
 
 
 def add(result: dict, level: str, message: str, path: Path | None = None) -> None:
@@ -384,6 +395,38 @@ def check_multilingual_links(result: dict, example_site: Path) -> None:
                 )
 
 
+def check_hardcoded_replaceable_images(result: dict, theme_dir: Path) -> None:
+    checked_roots = [theme_dir / "layouts", theme_dir / "assets"]
+    warnings = 0
+    for root in checked_roots:
+        if not root.exists():
+            continue
+        for path in root.rglob("*"):
+            if not path.is_file() or path.suffix.lower() not in TEXT_FILE_SUFFIXES:
+                continue
+            try:
+                text = path.read_text(encoding="utf-8")
+            except UnicodeDecodeError:
+                continue
+            except OSError:
+                continue
+            for match in HARDCODED_IMAGE_PATH_RE.finditer(text):
+                image_path = match.group(1)
+                image_name = Path(image_path).name.lower()
+                if not any(hint in image_name for hint in REPLACEABLE_IMAGE_HINTS):
+                    continue
+                add(
+                    result,
+                    "warnings",
+                    f"Publication check: hardcoded replaceable image path '{image_path}'. Prefer params, front matter, page resources, or data files with a fallback default.",
+                    path,
+                )
+                warnings += 1
+                if warnings >= 8:
+                    add(result, "info", "Skipped additional hardcoded replaceable image warnings after first 8 matches")
+                    return
+
+
 def detect_build_command(theme_dir: Path, site_dir: Path | None) -> tuple[Path, list[str]] | None:
     theme_name = theme_dir.name
     if site_dir is not None:
@@ -475,6 +518,7 @@ def main() -> int:
                 add(result, "warnings", "Publication check: missing RSS layout", layouts_dir)
             if not any_exists(theme_dir, FAVICON_CANDIDATES):
                 add(result, "warnings", "Publication check: no favicon or webmanifest asset detected")
+            check_hardcoded_replaceable_images(result, theme_dir)
 
         root_content = theme_dir / "content"
         if root_content.exists():

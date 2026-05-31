@@ -21,6 +21,8 @@ For themes intended for `themes.gohugo.io`, check:
 - `images/screenshot.png` or `.jpg`, 3:2 ratio, minimum `1500x1000`;
 - `images/tn.png` or `.jpg`, 3:2 ratio, minimum `900x600`;
 - preview images show the actual theme without browser/device mockups;
+- hero, avatar, about, profile, and social preview images are replaceable through params, front matter, page resources, or data files instead of being hard-coded to a real person or repository owner;
+- `exampleSite` demo content is neutral and reusable. Use a fictional person, studio, lab, product, venue, publication, or demo brand unless the requested deliverable is a real personal site;
 - if forked or ported, document why it is notably different and preserve original licensing requirements;
 - no paid-theme gating or README-as-advertisement for a paid variant.
 
@@ -45,6 +47,7 @@ For GitHub publication, also prefer:
 - mobile navigation and keyboard-accessible controls;
 - code highlighting styles when sample posts include code;
 - documented params such as `mainSections`, `dateFormat`, `defaultColor`, author/avatar/social fields, footer, and optional analytics/comments.
+- publication-safe generated demo assets: no real people, personal identifiers, readable text, logos, trademarks, or watermarks unless supplied as licensed user assets.
 
 ## Prototype Vs Product
 
@@ -56,6 +59,7 @@ A design-matching prototype can be intentionally small. A publishable theme shou
 - article images should support missing images, alt text, page resources, and reasonable resizing or aspect-ratio handling;
 - generated `images/screenshot.png` and `images/tn.png` should be rendered previews of the theme where possible, not schematic approximations;
 - `exampleSite` should demonstrate real authoring contracts: front matter fields, taxonomies, long/short content, image/no-image cards, code blocks, and single pages;
+- generated demo images should be visually inspected before preview capture. Regenerate assets and preview screenshots when faces, text, logos, watermarks, or crop artifacts make the package unsuitable for publication;
 - advertised features in `theme.toml`, README, or visible UI should be implemented and tested.
 
 Keep optional advanced features scoped. Do not add a Tailwind/npm pipeline, search engine, comments, PWA, or multilingual system only because a comparison theme has one; add them when the design, target audience, or publishing goal benefits from the extra surface.
@@ -136,6 +140,7 @@ Do not assume these paths exist in every installation, and do not copy example t
 - Put visual tokens in CSS custom properties or Sass variables where the existing pipeline supports it.
 - Keep navigation, footer links, socials, CTA labels, and hero content configurable through site params when practical.
 - Use Hugo image/resource pipelines for theme-owned assets that need fingerprinting, minification, resizing, or Sass compilation.
+- Read replaceable presentation images from `.Site.Params`, page `.Params`, page resources, or data files with fallback defaults. Avoid template-only literals such as `/images/specific-person.jpg` for hero/about/avatar/profile imagery in reusable themes.
 - Prefer semantic HTML landmarks: `header`, `nav`, `main`, `article`, `section`, `aside`, `footer`.
 - Use `.IsHome`, `.Kind`, `.Section`, `.Type`, `.Params`, `.Site.Params`, menus, taxonomies, and partial dicts intentionally instead of duplicating templates.
 - When the homepage design highlights a specific article/project, support an explicit front matter flag such as `featured = true` instead of assuming the latest dated content should appear first.
