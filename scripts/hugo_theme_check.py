@@ -149,6 +149,26 @@ TELEGRAM_IV_IMAGE_FALLBACK_HINTS = (
     "params.images",
     "params.cover",
 )
+SUBPATH_BASEURL = "https://example.org/blog/"
+DEMO_ASSET_SIZE_LIMIT = 1 * 1024 * 1024
+USER_ROOT_IMAGE_PATH_RE = re.compile(
+    r"""(?<![A-Za-z0-9:+.-])/(images/[^"'`\s)\]}>,]+?\.(?:avif|gif|jpe?g|png|svg|webp))""",
+    re.IGNORECASE,
+)
+ROOT_IMAGE_URL_PIPE_RE = re.compile(
+    r"""(?P<quote>["'`])(?P<path>/images/[^"'`\s)]+\.(?:avif|gif|jpe?g|png|svg|webp))(?P=quote)\s*\|\s*(?:relURL|absURL)\b""",
+    re.IGNORECASE,
+)
+ROOT_RELATIVE_ASSET_ATTR_RE = re.compile(
+    r"""\b(?P<attr>href|src)\s*=\s*(?P<quote>["'])(?P<path>/[^"'#?]+\.(?:avif|css|gif|ico|jpe?g|js|mjs|png|svg|webp))(?:[?#][^"']*)?(?P=quote)""",
+    re.IGNORECASE,
+)
+SAFEHTML_INNER_PIPELINE_RE = re.compile(r"""\.Inner(?:\s*\|\s*[\w.]+)*\s*\|\s*safeHTML""")
+DEMO_SOCIAL_PATTERNS = (
+    (re.compile(r"https?://example\.org/@[A-Za-z0-9_.-]+", re.IGNORECASE), "example.org/@... demo profile link"),
+    (re.compile(r"https?://(?:www\.)?linkedin\.com/", re.IGNORECASE), "LinkedIn demo social link"),
+    (re.compile(r"https?://github\.com/gohugoio/hugo\b", re.IGNORECASE), "github.com/gohugoio/hugo demo social link"),
+)
 
 
 def add(result: dict, level: str, message: str, path: Path | None = None) -> None:
@@ -714,6 +734,181 @@ def check_telegram_instant_view(result: dict, theme_dir: Path) -> None:
         )
 
 
+def front_matter_fragment(text: str) -> str:
+    if text.startswith("---\n"):
+        end = text.find("\n---", 4)
+        if end != -1:
+            return text[: end + 4]
+    if text.startswith("+++\n"):
+        end = text.find("\n+++", 4)
+        if end != -1:
+            return text[: end + 4]
+    return text
+
+
+def config_and_front_matter_texts(theme_dir: Path) -> dict[Path, str]:
+    texts: dict[Path, str] = {}
+    roots = [theme_dir, theme_dir / "exampleSite"]
+    for root in roots:
+        for name in CONFIG_FILES + CONFIG_DIR_FILES:
+            path = root / name
+            if path.exists():
+                text = read_text_if_possible(path)
+                if text:
+                    texts[path] = text
+    for path, text in readme_texts(theme_dir).items():
+        texts[path] = text
+    for root in (theme_dir / "archetypes", theme_dir / "exampleSite" / "content"):
+        if not root.exists():
+            continue
+        for path in root.rglob("*"):
+            if not path.is_file() or path.suffix.lower() not in {".md", ".toml", ".yaml", ".yml", ".json"}:
+                continue
+            text = read_text_if_possible(path)
+            if text:
+                texts[path] = front_matter_fragment(text)
+    return texts
+
+
+def check_subpath_safe_user_paths(result: dict, theme_dir: Path) -> None:
+    warnings = 0
+    for path, text in config_and_front_matter_texts(theme_dir).items():
+        for match in USER_ROOT_IMAGE_PATH_RE.finditer(text):
+            add(
+                result,
+                "warnings",
+                f"Publication check: user-facing image path '/{match.group(1)}' is root-relative. Prefer 'images/...' in README/config/front matter so deployments under subpaths work.",
+                path,
+            )
+            warnings += 1
+            if warnings >= 8:
+                add(result, "info", "Skipped additional root-relative user image path warnings after first 8 matches")
+                return
+
+
+def check_template_root_image_url_pipes(result: dict, theme_dir: Path) -> None:
+    warnings = 0
+    for path, text in collect_text_from_roots([theme_dir / "layouts", theme_dir / "assets"]).items():
+        for match in ROOT_IMAGE_URL_PIPE_RE.finditer(text):
+            add(
+                result,
+                "warnings",
+                f"Publication check: template pipes root-relative image path '{match.group('path')}' through relURL/absURL. Prefer a relative path or trim the leading slash before URL helpers.",
+                path,
+            )
+            warnings += 1
+            if warnings >= 8:
+                add(result, "info", "Skipped additional template root-relative image URL helper warnings after first 8 matches")
+                return
+
+
+def check_demo_social_links(result: dict, theme_dir: Path) -> None:
+    example_site = theme_dir / "exampleSite"
+    if not example_site.exists():
+        return
+    warnings = 0
+    for path, text in collect_text_from_roots([example_site]).items():
+        for pattern, label in DEMO_SOCIAL_PATTERNS:
+            if not pattern.search(text):
+                continue
+            add(
+                result,
+                "warnings",
+                f"Publication check: exampleSite contains {label}. Demo social links should be real theme-author attribution links or absent.",
+                path,
+            )
+            warnings += 1
+            if warnings >= 8:
+                add(result, "info", "Skipped additional demo social link warnings after first 8 matches")
+                return
+
+
+def check_demo_asset_sizes(result: dict, theme_dir: Path) -> None:
+    roots = [
+        theme_dir / "static" / "images",
+        theme_dir / "exampleSite" / "static" / "images",
+    ]
+    warnings = 0
+    for root in roots:
+        if not root.exists():
+            continue
+        for path in root.rglob("*"):
+            if not path.is_file() or path.suffix.lower() not in {".jpg", ".jpeg", ".png"}:
+                continue
+            try:
+                size = path.stat().st_size
+            except OSError:
+                continue
+            if size <= DEMO_ASSET_SIZE_LIMIT:
+                continue
+            add(
+                result,
+                "warnings",
+                f"Publication check: demo image is {size} bytes; compress large PNG/JPG assets or use JPEG/WebP where appropriate.",
+                path,
+            )
+            warnings += 1
+            if warnings >= 8:
+                add(result, "info", "Skipped additional oversized demo image warnings after first 8 matches")
+                return
+
+
+def check_safe_code_render_hooks(result: dict, theme_dir: Path) -> None:
+    layouts_dir = theme_dir / "layouts"
+    if not layouts_dir.exists():
+        return
+    for path in layouts_dir.rglob("render-codeblock.html"):
+        text = read_text_if_possible(path)
+        if not text:
+            continue
+        for match in SAFEHTML_INNER_PIPELINE_RE.finditer(text):
+            if "htmlEscape" in match.group(0):
+                continue
+            add(
+                result,
+                "warnings",
+                "Publication check: render-codeblock.html pipes .Inner to safeHTML without htmlEscape; fenced code content must remain escaped while preserving language metadata.",
+                path,
+            )
+            break
+
+
+def check_subpath_build(result: dict, build: tuple[Path, list[str]], timeout: int) -> None:
+    cwd, command = build
+    with tempfile.TemporaryDirectory(prefix="hugo-theme-check-subpath-") as destination:
+        build_command = command + ["--baseURL", SUBPATH_BASEURL, "--destination", destination, "--noBuildLock"]
+        code, output = run_command(build_command, cwd, timeout)
+        if code == 0:
+            add(result, "info", f"Hugo subpath smoke build succeeded with baseURL {SUBPATH_BASEURL}", cwd)
+            check_subpath_build_output_assets(result, Path(destination))
+        else:
+            add(
+                result,
+                "warnings",
+                f"Publication check: Hugo subpath smoke build failed with baseURL {SUBPATH_BASEURL}: {output}",
+                cwd,
+            )
+
+
+def check_subpath_build_output_assets(result: dict, destination: Path) -> None:
+    warnings = 0
+    for path in destination.rglob("*.html"):
+        text = read_text_if_possible(path)
+        if not text:
+            continue
+        for match in ROOT_RELATIVE_ASSET_ATTR_RE.finditer(text):
+            add(
+                result,
+                "warnings",
+                f"Publication check: subpath build output contains root-relative asset {match.group('attr')}=\"{match.group('path')}\". Use relURL/absURL with relative inputs or page/resource URLs.",
+                path,
+            )
+            warnings += 1
+            if warnings >= 8:
+                add(result, "info", "Skipped additional subpath output root-relative asset warnings after first 8 matches")
+                return
+
+
 def detect_build_command(theme_dir: Path, site_dir: Path | None) -> tuple[Path, list[str]] | None:
     theme_name = theme_dir.name
     if site_dir is not None:
@@ -809,6 +1004,11 @@ def main() -> int:
             check_hardcoded_replaceable_images(result, theme_dir)
             check_footer_theme_attribution(result, theme_dir)
             check_telegram_instant_view(result, theme_dir)
+            check_subpath_safe_user_paths(result, theme_dir)
+            check_template_root_image_url_pipes(result, theme_dir)
+            check_demo_social_links(result, theme_dir)
+            check_demo_asset_sizes(result, theme_dir)
+            check_safe_code_render_hooks(result, theme_dir)
 
         root_content = theme_dir / "content"
         if root_content.exists():
@@ -862,6 +1062,8 @@ def main() -> int:
                     code, output = run_command(build_command, cwd, args.timeout)
                 if code == 0:
                     add(result, "info", "Hugo smoke build succeeded", cwd)
+                    if args.publication:
+                        check_subpath_build(result, build, args.timeout)
                 else:
                     add(result, "errors", f"Hugo smoke build failed with exit code {code}: {output}", cwd)
 

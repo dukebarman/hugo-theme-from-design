@@ -439,6 +439,196 @@ class HugoThemeCheckTests(unittest.TestCase):
 
             self.assertEqual(result["warnings"], [])
 
+    def test_subpath_safe_user_paths_warns_for_root_relative_images(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            theme = Path(tmp)
+            (theme / "exampleSite" / "content").mkdir(parents=True)
+            (theme / "README.md").write_text("Set `heroImage = \"/images/hero.jpg\"`.\n", encoding="utf-8")
+            (theme / "exampleSite" / "content" / "_index.md").write_text(
+                "---\nheroImage: /images/about.png\n---\nBody /images/body.png\n",
+                encoding="utf-8",
+            )
+            result = {"warnings": [], "info": [], "errors": []}
+
+            hugo_theme_check.check_subpath_safe_user_paths(result, theme)
+
+            messages = [warning["message"] for warning in result["warnings"]]
+            self.assertEqual(len(messages), 2)
+            self.assertTrue(all("root-relative" in message for message in messages))
+
+    def test_template_root_image_url_pipes_warns_for_relurl_inputs(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            theme = Path(tmp)
+            (theme / "layouts" / "_partials").mkdir(parents=True)
+            (theme / "layouts" / "_partials" / "hero.html").write_text(
+                '<img src="{{ "/images/hero.jpg" | relURL }}" alt="">\n'
+                '<img src="{{ `images/ok.jpg` | relURL }}" alt="">\n',
+                encoding="utf-8",
+            )
+            result = {"warnings": [], "info": [], "errors": []}
+
+            hugo_theme_check.check_template_root_image_url_pipes(result, theme)
+
+            self.assertEqual(len(result["warnings"]), 1)
+            self.assertIn("root-relative image path", result["warnings"][0]["message"])
+            self.assertIn("/images/hero.jpg", result["warnings"][0]["message"])
+
+    def test_subpath_build_output_assets_warns_for_root_relative_assets(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            destination = Path(tmp)
+            (destination / "posts").mkdir()
+            (destination / "posts" / "index.html").write_text(
+                '<link rel="stylesheet" href="/css/site.css"><img src="/images/hero.webp"><a href="/posts/">Post</a>\n',
+                encoding="utf-8",
+            )
+            result = {"warnings": [], "info": [], "errors": []}
+
+            hugo_theme_check.check_subpath_build_output_assets(result, destination)
+
+            messages = [warning["message"] for warning in result["warnings"]]
+            self.assertEqual(len(messages), 2)
+            self.assertTrue(any('href="/css/site.css"' in message for message in messages))
+            self.assertTrue(any('src="/images/hero.webp"' in message for message in messages))
+
+    def test_demo_social_links_warns_for_suspicious_demo_profiles(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            theme = Path(tmp)
+            (theme / "exampleSite").mkdir()
+            (theme / "exampleSite" / "hugo.toml").write_text(
+                "\n".join(
+                    [
+                        'twitter = "https://example.org/@demo"',
+                        'linkedin = "https://www.linkedin.com/in/demo"',
+                        'github = "https://github.com/gohugoio/hugo"',
+                    ]
+                ),
+                encoding="utf-8",
+            )
+            result = {"warnings": [], "info": [], "errors": []}
+
+            hugo_theme_check.check_demo_social_links(result, theme)
+
+            messages = [warning["message"] for warning in result["warnings"]]
+            self.assertEqual(len(messages), 3)
+            self.assertTrue(any("example.org/@..." in message for message in messages))
+            self.assertTrue(any("LinkedIn" in message for message in messages))
+            self.assertTrue(any("github.com/gohugoio/hugo" in message for message in messages))
+
+    def test_demo_asset_sizes_warns_for_large_static_images(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            theme = Path(tmp)
+            (theme / "static" / "images").mkdir(parents=True)
+            large = theme / "static" / "images" / "hero.png"
+            large.write_bytes(b"0" * (hugo_theme_check.DEMO_ASSET_SIZE_LIMIT + 1))
+            result = {"warnings": [], "info": [], "errors": []}
+
+            hugo_theme_check.check_demo_asset_sizes(result, theme)
+
+            self.assertEqual(len(result["warnings"]), 1)
+            self.assertIn("compress large PNG/JPG", result["warnings"][0]["message"])
+
+    def test_safe_code_render_hooks_warns_for_unescaped_safehtml(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            theme = Path(tmp)
+            (theme / "layouts" / "_markup").mkdir(parents=True)
+            (theme / "layouts" / "_markup" / "render-codeblock.html").write_text(
+                '<pre data-language="{{ .Type }}"><code>{{ .Inner | safeHTML }}</code></pre>\n',
+                encoding="utf-8",
+            )
+            result = {"warnings": [], "info": [], "errors": []}
+
+            hugo_theme_check.check_safe_code_render_hooks(result, theme)
+
+            self.assertEqual(len(result["warnings"]), 1)
+            self.assertIn("without htmlEscape", result["warnings"][0]["message"])
+
+    def test_safe_code_render_hooks_accepts_html_escape_before_safehtml(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            theme = Path(tmp)
+            (theme / "layouts" / "_markup").mkdir(parents=True)
+            (theme / "layouts" / "_markup" / "render-codeblock.html").write_text(
+                '<pre data-language="{{ .Type }}"><code>{{ .Inner | htmlEscape | safeHTML }}</code></pre>\n',
+                encoding="utf-8",
+            )
+            result = {"warnings": [], "info": [], "errors": []}
+
+            hugo_theme_check.check_safe_code_render_hooks(result, theme)
+
+            self.assertEqual(result["warnings"], [])
+
+    def test_subpath_build_warns_on_failure(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            cwd = Path(tmp)
+            result = {"warnings": [], "info": [], "errors": []}
+
+            with mock.patch.object(hugo_theme_check, "run_command", return_value=(1, "bad relURL")):
+                hugo_theme_check.check_subpath_build(result, (cwd, ["hugo", "--theme", "demo"]), 60)
+
+            self.assertEqual(len(result["warnings"]), 1)
+            self.assertIn("subpath smoke build failed", result["warnings"][0]["message"])
+            self.assertIn(hugo_theme_check.SUBPATH_BASEURL, result["warnings"][0]["message"])
+
+    def test_subpath_build_scans_generated_html_on_success(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            cwd = Path(tmp)
+            result = {"warnings": [], "info": [], "errors": []}
+
+            def fake_run_command(args: list[str], cwd: Path, timeout: int) -> tuple[int, str]:
+                destination = Path(args[args.index("--destination") + 1])
+                destination.mkdir(parents=True, exist_ok=True)
+                (destination / "index.html").write_text('<script src="/js/app.js"></script>\n', encoding="utf-8")
+                return 0, "ok"
+
+            with mock.patch.object(hugo_theme_check, "run_command", side_effect=fake_run_command):
+                hugo_theme_check.check_subpath_build(result, (cwd, ["hugo", "--theme", "demo"]), 60)
+
+            self.assertTrue(any("subpath smoke build succeeded" in entry["message"] for entry in result["info"]))
+            self.assertTrue(any('src="/js/app.js"' in warning["message"] for warning in result["warnings"]))
+
+    def test_publication_main_warns_for_new_publication_patterns(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            theme = Path(tmp)
+            for directory in ("archetypes", "assets", "content", "data", "i18n", "layouts", "static"):
+                (theme / directory).mkdir(parents=True)
+            (theme / "layouts" / "_partials").mkdir()
+            (theme / "layouts" / "_partials" / "head.html").write_text(
+                '<img src="{{ "/images/hero.jpg" | absURL }}" alt="">\n',
+                encoding="utf-8",
+            )
+            (theme / "layouts" / "home.html").write_text("{{ define \"main\" }}{{ end }}\n", encoding="utf-8")
+            (theme / "hugo.toml").write_text("title = 'Demo'\n", encoding="utf-8")
+            (theme / "theme.toml").write_text(
+                "\n".join(
+                    [
+                        "name = 'Demo'",
+                        "license = 'MIT'",
+                        "licenselink = 'https://example.org/license'",
+                        "description = 'Demo theme'",
+                        "homepage = 'https://example.org/'",
+                        "min_version = '0.146.0'",
+                    ]
+                ),
+                encoding="utf-8",
+            )
+            (theme / "README.md").write_text('Use `heroImage = "/images/hero.jpg"`.\n', encoding="utf-8")
+            (theme / "LICENSE").write_text("MIT\n", encoding="utf-8")
+            argv = ["hugo_theme_check.py", "--theme-dir", str(theme), "--publication", "--skip-build"]
+            buffer = io.StringIO()
+
+            with (
+                mock.patch.object(sys, "argv", argv),
+                mock.patch.object(hugo_theme_check.shutil, "which", return_value="/usr/bin/hugo"),
+                mock.patch.object(hugo_theme_check, "run_command", return_value=(0, "hugo v0.161.1")),
+                contextlib.redirect_stdout(buffer),
+            ):
+                code = hugo_theme_check.main()
+
+        payload = json.loads(buffer.getvalue())
+        self.assertEqual(code, 0)
+        messages = [warning["message"] for warning in payload["warnings"]]
+        self.assertTrue(any("user-facing image path" in message for message in messages))
+        self.assertTrue(any("template pipes root-relative image path" in message for message in messages))
+
     def test_publication_warns_about_theme_root_build_artifacts(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             theme = Path(tmp)

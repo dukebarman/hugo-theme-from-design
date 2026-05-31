@@ -43,72 +43,23 @@ When updating an existing theme, keep its public configuration and content conve
 
 ## New Variant Vs Update
 
-For a new design request, create a new variant rather than overwriting the old theme. Choose a clear variant name from the design direction or user-provided name, scaffold or copy only the minimum reusable pieces needed, and keep the original theme intact for comparison and rollback.
+For a new design request, create a new variant instead of overwriting an existing theme. Pick a clear variant name, scaffold or copy only what is needed, and keep the original available for comparison.
 
-If the user explicitly requests a port, reimplementation, update, migration, or compatibility with a known theme such as Hyde, Poole, PaperMod, Blonde, or another named theme, treat it as a port/reimplementation task rather than a pure new-variant task. Preserve the recognizable architecture and public configuration where it matters: original metadata in `theme.toml`, README/license attribution, established CSS/module split, theme params, 404/RSS/code/print styles, and compatibility conventions. Do not force `exampleSite` if the target package style intentionally omits it, but provide a buildable demo site when the user asks for a generated variant.
+If the user asks for a port, reimplementation, migration, update, or compatibility with a named theme such as Hyde, Poole, PaperMod, or Blonde, treat it as a compatibility task. Audit and preserve the public surface where users depend on it: config params, menus, content sections, taxonomies, shortcodes/render hooks, partial extension points, assets/tooling, README/license/original metadata, and optional integrations. Do not force `exampleSite` if the target package style intentionally omits it, but provide a buildable demo when requested.
 
-When themes are provided only as examples, use them to infer what a useful working Hugo theme should include, such as `exampleSite`, metadata, preview images, pagination, taxonomy pages, real controls, and documented params. Do not copy their public API or ask about compatibility unless the user frames one of them as the target.
+When themes are only examples, use them as a quality reference, not as a public API contract. If the target is ambiguous, state the path: compatible port preserving the original surface, or simpler visual variant. If the user says "new theme", "new variant", "test the skill", or provides only a screenshot, default to a polished new variant.
 
-Before reimplementing or comparing against an existing target theme, audit its compatibility surface:
-- config params and menus from `hugo.toml`, `config/_default/*`, README examples, and `exampleSite`;
-- widgets, partial extension points, shortcodes, render hooks, taxonomies, content section names, and archetypes;
-- asset/icon strategy and whether an npm/Tailwind/PostCSS/Sass pipeline is part of the public development workflow;
-- optional integrations such as search, Pagefind, analytics, comments, ads, social/share links, PWA, or multilingual support.
-
-Then choose and state one of two paths: preserve that surface for a compatible port, or intentionally produce a simpler new variant and call out the features not carried over. If the user has already said "new theme", "new variant", "test the skill", or provided only a screenshot, default to a polished new-variant path without stopping for clarification.
-
-For an update/migration from an old theme:
-- audit current layouts, params, content types, menus, taxonomies, shortcodes, i18n, assets, and public configuration before editing;
-- preserve existing URLs, front matter contracts, params, and documented customization points unless the user approves a breaking change;
-- migrate template conventions only when needed for the requested update or current Hugo compatibility;
-- update or add `exampleSite` so it demonstrates the migrated design and catches compatibility regressions;
-- keep old-to-new mapping notes in the final answer so users know what changed.
+For old-theme updates, preserve URLs, front matter contracts, params, translations, shortcodes, and documented customization points unless the user approves a breaking change. Migrate template conventions only when required, update/add `exampleSite` to catch regressions, and summarize old-to-new mappings in the final answer.
 
 ## ExampleSite Generation
 
-For every new theme variant, create `exampleSite/` inside the theme. Model the structure after mature Hugo themes or any local examples present in the workspace, but tailor content to the received design.
+For every new theme variant, create `exampleSite/` inside the theme. Include config, homepage content, representative sections, menus/params/taxonomies, and enough Markdown/front matter to exercise home, list, single, taxonomy, pagination, media, navigation, footer, and long/empty states.
 
-The minimum useful `exampleSite` includes:
-- `exampleSite/hugo.toml` with `baseURL`, `languageCode`, `title`, `theme = "<theme-folder-name>"`, menus, taxonomies, and `[params]` values needed by the design;
-- `exampleSite/content/_index.md` for homepage content/front matter;
-- section content matching the design, such as `posts/`, `portfolio/`, `about/`, `services/`, `projects/`, `docs/`, or `contact/`;
-- enough sample Markdown to exercise home, section/list, page/single, taxonomy/term, pagination, media cards, navigation, footer, and empty/long text states;
-- sample front matter for design-specific fields such as hero images, eyebrow text, CTAs, featured flags, authors, tags, dates, summaries, external links, and gallery assets.
-
-For reusable theme packages, keep the demo neutral. Do not make `exampleSite` a biography or portfolio of the theme author, repository owner, or user unless that is the requested site. Use a fictional person, studio, lab, product, venue, publication, or demo brand that fits the design. Personal names are acceptable only when clearly fictional and not tied to real contact details, usernames, headshots, logos, or personal identifiers.
-
-For multilingual `exampleSite` demos, make language branches complete enough to validate navigation and related-content behavior. If `defaultContentLanguageInSubdir = true`, keep internal demo links inside the same language branch by default, such as `/en/post/` from English pages and `/ru/post/` from Russian pages, unless the design explicitly demonstrates cross-language links.
-
-Keep generated demo content credible but lightweight. Do not put built output such as `public/` or `.hugo_build.lock` into the theme unless the user explicitly wants generated artifacts.
+For reusable packages, keep demos neutral: a fictional person/studio/lab/product/venue/publication is fine, but do not make the demo a biography or portfolio of the theme author, repo owner, or user unless requested. Omit fake socials and unrelated real profiles; use RSS only or real theme-author links in footer attribution. For multilingual demos with `defaultContentLanguageInSubdir = true`, keep internal links inside the active language branch. Never leave `exampleSite/public/` or `.hugo_build.lock` in the deliverable unless requested.
 
 ## Production Readiness
 
-For quick design tests, keep the theme focused and small. For a publishable GitHub theme or a theme intended for `themes.gohugo.io`, read the production checklist in `references/hugo-theme-notes.md` and add the expected package surface: README, license, richer `exampleSite`, favicon/webmanifest assets, 404/RSS/templates, responsive mobile navigation, code styles when posts include code, footer theme attribution, and documented params.
-
-For publishable themes, include a neutral demo favicon set when the theme owns `<head>` metadata:
-- `static/favicon.ico`;
-- `static/favicon-16x16.png`;
-- `static/favicon-32x32.png`;
-- `static/apple-touch-icon.png`;
-- `static/android-chrome-192x192.png`;
-- `static/android-chrome-512x512.png`;
-- `static/site.webmanifest`.
-
-Prefer a simplified high-contrast mark over cropping a detailed hero image. The favicon must remain recognizable at 16x16 and 32x32. Use the generated/demo visual language, but avoid real people, personal identifiers, readable text, logos, trademarks, and watermarks.
-
-Wire the icons in the head partial:
-
-```html
-<link rel="icon" href="{{ `favicon.ico` | relURL }}" sizes="any" />
-<link rel="icon" type="image/png" sizes="32x32" href="{{ `favicon-32x32.png` | relURL }}" />
-<link rel="icon" type="image/png" sizes="16x16" href="{{ `favicon-16x16.png` | relURL }}" />
-<link rel="apple-touch-icon" sizes="180x180" href="{{ `apple-touch-icon.png` | relURL }}" />
-<link rel="manifest" href="{{ `site.webmanifest` | relURL }}" />
-```
-
-Document that these are demo assets and that site owners can override them by placing files with the same names in their site `static/` directory.
-
-For publishable blog, magazine, documentation, or long-form article themes, make article pages friendly to external article renderers such as Telegram Instant View: stable article selectors, removable UI chrome markers, article metadata, cover support, figure captions, and code-block language metadata. Do not imply that Instant View is automatic; Telegram IV templates are configured and validated per live domain.
+For quick design tests, keep the theme focused and small. For GitHub/themes.gohugo.io publication, read `references/hugo-theme-notes.md` and add the expected package surface: README, license, theme metadata, richer `exampleSite`, preview images, favicon/webmanifest when the theme owns `<head>`, 404/RSS, responsive navigation, code styles, footer theme attribution, documented params, and subpath-safe assets.
 
 Do not confuse a visually plausible prototype with a reusable theme product. When the user compares against a mature human-made theme or plans to publish the result, graduate the implementation beyond screenshot matching:
 - replace decorative or placeholder UI with working Hugo behavior, or remove controls that are only visual;
@@ -116,32 +67,22 @@ Do not confuse a visually plausible prototype with a reusable theme product. Whe
 - use real icon assets or an icon partial instead of unicode stand-ins for reusable theme UI;
 - make post images robust with page resources/static assets and resizing where practical;
 - make prominent theme images replaceable. Do not hard-code hero, avatar, about, profile, or social preview paths such as `/images/specific-person.jpg` directly into templates as the only source. Read them from `params`, front matter, page resources, or data files with documented fallback defaults, for example `params.heroImage`, `params.aboutImage`, `params.avatar`, and `params.images`;
+- keep user-facing paths subpath-safe. In README examples, config params, archetypes, and front matter prefer `images/foo.jpg` over `/images/foo.jpg`; when template code receives a user path before `relURL` or `absURL`, normalize accidental leading slashes so a non-root `baseURL` such as `https://example.org/blog/` still works;
 - add an unobtrusive publication footer attribution for reusable themes, separate from site author/copyright: `Theme <ThemeName> by <ThemeAuthor>.` Enable it by default, make it disableable through `params.footer.showThemeAttribution`, localize the sentence through i18n, support separate `themeURL` and `themeAuthorURL`, and document the params in README;
 - add search, comments, PWA, i18n, analytics, or shortcodes only when requested or implied, but make advertised features actually work;
 - generate preview screenshots from the rendered theme when a browser screenshot tool is available instead of drawing schematic placeholder previews.
 
-When generating demo assets for a publishable theme, keep prompts publication-safe: explicitly exclude real people, personal identifiers, readable text, logos, trademarks, and watermarks unless the user provided licensed assets and requested them. After generation, visually inspect the asset, regenerate if artifacts or prohibited details appear, then regenerate `images/screenshot.png` and `images/tn.png` from the rendered theme preview.
-
-When generating favicon assets, visually inspect at least 32x32 and 16x16. Regenerate or simplify if the icon becomes an indistinct dark blob, loses its silhouette, or depends on text or fine detail.
+For publishable demo assets, exclude real people, personal identifiers, readable text, logos, trademarks, and watermarks unless the user supplied licensed assets. Compress large demo images, prefer JPEG/WebP for large illustrations, inspect favicon outputs at 32x32 and 16x16, and regenerate rendered `images/screenshot.png` and `images/tn.png` after asset changes.
 
 ## Telegram Instant View Support
 
 When the user asks for Telegram Instant View support, or when preparing a publishable article-focused theme where Telegram sharing matters:
 
-- Add stable selectors to single article templates, independent from visual CSS classes:
-  - `article[data-iv-article]`;
-  - `.iv-title`;
-  - `[data-iv-published]`;
-  - `[data-iv-content]`;
-  - optional `[data-iv-cover]`;
-  - `[data-iv-remove]` for nav, footer, share buttons, sidebars, related posts, graphs, comments, and other UI chrome.
-- Add article metadata in `head`: canonical URL, description, Open Graph article fields, `og:image`, `article:published_time`, `article:modified_time`, `article:author`, and optional JSON-LD `BlogPosting`.
-- Support front matter fields such as `author`, `authorURL`, `cover`, `coverAlt`, `coverCaption`, and `images`.
-- Add render hooks for Markdown images and code blocks when missing:
-  - images should render as `figure > img + figcaption` when captions exist;
-  - fenced code blocks should expose the language, for example `<pre data-language="go">`.
-- Include a sample `docs/telegram-instant-view.tpl`, or copy `assets/telegram-instant-view.tpl` from this skill when available. Adapt the `?path` rule to the live site's URL structure, such as `/posts/`, `/blog/`, `/articles/`, or `/docs/`.
-- Document that Telegram Instant View must be configured and validated per live domain in Telegram's editor. The theme prepares renderer-friendly HTML and an example template; it does not enable Instant View automatically.
+- Add stable article selectors such as `article[data-iv-article]`, `.iv-title`, `[data-iv-published]`, `[data-iv-content]`, optional `[data-iv-cover]`, and `[data-iv-remove]` on UI chrome.
+- Add article metadata in `head`, including canonical/description, Open Graph article fields, `og:image`, publish/modified time, author, and optional JSON-LD.
+- Support front matter for author and cover/image fields.
+- Add render hooks when missing: images as `figure` with captions, code blocks with language metadata, and escaped fenced code (`{{ .Inner | htmlEscape | safeHTML }}` if `safeHTML` is needed).
+- Include `docs/telegram-instant-view.tpl` from `assets/telegram-instant-view.tpl` when useful, adapt path rules, and document that Telegram IV must be configured and validated per live domain.
 
 ## Hugo Implementation Rules
 
@@ -176,7 +117,7 @@ hugo server --source <site-or-exampleSite> --theme <theme-name> --disableFastRen
 
 For standalone theme repositories, build the included `exampleSite` when present. For new variants, create `exampleSite` before final validation. For old themes without `exampleSite`, either add one as part of the migration/update or clearly report why it was out of scope.
 
-For publishable standalone theme packages, run publication validation before finishing:
+For publishable standalone theme packages, run publication validation before finishing; `--publication` also performs the subpath `baseURL` smoke build:
 
 ```bash
 python3 scripts/hugo_theme_check.py --theme-dir /path/to/theme --publication
@@ -197,7 +138,7 @@ Read `references/ux-ui-checklist.md` before final visual verification. Treat it 
 - do not add marketing copy or feature explanations unless the design calls for them.
 - for generated favicon assets, inspect the 32x32 and 16x16 outputs as actual small icons; simplify or regenerate if they become indistinct blobs, lose their silhouette, or rely on text/fine detail.
 
-Use browser screenshots when a local server can run. Prefer whatever headless browser is available in the environment, such as Playwright, Chromium/Chrome, Firefox, WebKit, or another browser already installed by the project. Check desktop and mobile widths. Before capturing, preflight the requested URL with an HTTP/HTML check and capture the final page when the root responds with an HTTP redirect, meta refresh, or same-origin canonical URL. For multilingual sites with `defaultContentLanguageInSubdir = true`, do not assume `/` is the usable preview page; determine and capture the rendered language URL such as `/en/` or `/ru/`. If Firefox on macOS is used while a regular Firefox session is open, run it with a temporary profile, for example `firefox --headless --profile /tmp/<profile> --screenshot /tmp/<theme>.png --window-size 1440,1000 <url>`. If Firefox headless produces a blank or invalid screenshot under sandboxing, repeat with an approved regular headless Firefox command and inspect the resulting image before trusting it. If no browser screenshot tool is available, report that visual verification was limited to Hugo build, rendered HTML, and CSS/DOM inspection. Fix text overflow, overlapping UI, broken image crops, illegible contrast, broken controls, and navigation states.
+Use browser screenshots when a local server can run. Check desktop and mobile widths, preflight redirects or multilingual root paths before capture, use a temporary Firefox profile if needed on macOS, and inspect screenshots before trusting them. If no browser screenshot tool is available, report that visual verification was limited to Hugo build, rendered HTML, and CSS/DOM inspection. Fix text overflow, overlap, broken crops, illegible contrast, broken controls, and navigation states.
 
 Do not make critical hero text depend on an initial `opacity: 0` animation state for screenshot capture. Either keep essential text visible without JavaScript and animation completion, honor `prefers-reduced-motion`, or wait/disable animations in the capture path before accepting preview images.
 
@@ -218,7 +159,7 @@ python3 scripts/hugo_theme_check.py --theme-dir /path/to/theme --publication
 python3 scripts/hugo_theme_check.py --theme-dir /path/to/theme --mode port --publication
 ```
 
-The checker emits JSON with `errors`, `warnings`, `info`, and an overall `ok` flag. Use default `--mode new` for generated variants with `exampleSite`; use `--mode port` for known-theme ports where compatibility, attribution, README/license, and original structure matter more than Hugo's generated skeleton. Add `--publication` when preparing a GitHub/public theme package. Preview image validation should check dimensions, aspect ratio, and pixel sanity; a generated PNG is not successful if it is blank, nearly all white/black, or just a single background color. Empty `layouts/_partials` or `layouts/partials` directories are not evidence of a modern or legacy implementation. Still run Hugo itself and inspect the rendered site for visual quality.
+The checker emits JSON with `errors`, `warnings`, `info`, and `ok`. Use default `--mode new` for generated variants with `exampleSite`; use `--mode port` for known-theme ports. Add `--publication` for GitHub/public packages. It warns about preview dimensions/pixel sanity, empty partials, missing package surface, subpath build failures and root-relative asset output, root-relative user/template image paths, fake demo socials, oversized demo PNG/JPG assets, and unsafe code render hooks. Still run Hugo and inspect the rendered site for visual quality.
 
 For skill development, run the bundled unit tests after changing scripts:
 

@@ -6,6 +6,8 @@ The skill is aimed at turning a visual design into a reusable Hugo theme package
 
 For publishable themes, the skill also guides neutral demo favicon/webmanifest assets when the theme owns `<head>` metadata. Favicons should use a simplified high-contrast mark that remains readable at 16x16 and 32x32, not a tiny crop of a detailed hero image.
 
+Publication guidance also covers subpath-safe asset URLs, neutral demo social links, compressed demo imagery, and safe code render hooks.
+
 For publishable blog, magazine, documentation, and long-form article themes, the skill can also prepare renderer-friendly article markup for Telegram Instant View and similar extractors. This is optional: the generated theme can expose stable selectors and a sample IV template, but Telegram Instant View must still be configured and validated per live domain in Telegram's editor.
 
 ## When to use it
@@ -98,6 +100,14 @@ Publication checks include warning-level favicon/webmanifest checks: missing
 manifest companion icons, missing files referenced from favicon links in head
 partials, missing README override documentation, and basic sanity checks for
 `favicon-16x16.png` and `favicon-32x32.png`.
+
+Publication checks also run a subpath `baseURL` smoke build when builds are not
+skipped. They warn when generated HTML still contains root-relative asset
+links such as `src="/js/app.js"`, when README/config/front matter recommend
+root-relative `/images/...` params, when templates pipe `"/images/..."` through
+`relURL` or `absURL`, when neutral demos contain fake or unrelated social
+profiles, when demo PNG/JPG assets under `static/images` are oversized, and
+when code block render hooks pass `.Inner` to `safeHTML` without `htmlEscape`.
 
 When a theme declares Telegram Instant View support in its README or includes
 `docs/telegram-instant-view.tpl`, publication checks emit warning-level

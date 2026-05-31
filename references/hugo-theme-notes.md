@@ -24,6 +24,10 @@ For themes intended for `themes.gohugo.io`, check:
 - hero, avatar, about, profile, and social preview images are replaceable through params, front matter, page resources, or data files instead of being hard-coded to a real person or repository owner;
 - footer theme attribution is present, separate from site author/copyright, enabled by default, disableable through params, localized through i18n, and supports separate theme and theme-author URLs;
 - `exampleSite` demo content is neutral and reusable. Use a fictional person, studio, lab, product, venue, publication, or demo brand unless the requested deliverable is a real personal site;
+- demo social links are real theme-author attribution links or absent. Do not use fake handles such as `example.org/@demo`, unrelated LinkedIn profiles, or unrelated repository links as social demos;
+- user-facing image paths in README/config/archetypes/front matter are subpath-safe, using `images/foo.jpg` rather than `/images/foo.jpg`;
+- templates do not pass root-relative user/static image literals such as `"/images/foo.jpg"` directly into `relURL` or `absURL`;
+- the theme builds with a non-root `baseURL`, such as `https://example.org/blog/`;
 - if forked or ported, document why it is notably different and preserve original licensing requirements;
 - no paid-theme gating or README-as-advertisement for a paid variant.
 
@@ -49,6 +53,7 @@ For GitHub publication, also prefer:
 - code highlighting styles when sample posts include code;
 - documented params such as `mainSections`, `dateFormat`, `defaultColor`, author/avatar/social fields, footer, and optional analytics/comments.
 - publication-safe generated demo assets: no real people, personal identifiers, readable text, logos, trademarks, or watermarks unless supplied as licensed user assets.
+- compressed demo images: avoid large PNG/JPG files over roughly 1 MB in `static/images` unless there is a deliberate visual need; prefer JPEG/WebP for large demo illustrations.
 
 Recommended footer attribution config:
 
@@ -75,7 +80,7 @@ A design-matching prototype can be intentionally small. A publishable theme shou
 - article images should support missing images, alt text, page resources, and reasonable resizing or aspect-ratio handling;
 - generated `images/screenshot.png` and `images/tn.png` should be rendered previews of the theme where possible, not schematic approximations;
 - `exampleSite` should demonstrate real authoring contracts: front matter fields, taxonomies, long/short content, image/no-image cards, code blocks, and single pages;
-- generated demo images should be visually inspected before preview capture. Regenerate assets and preview screenshots when faces, text, logos, watermarks, or crop artifacts make the package unsuitable for publication;
+- generated demo images should be compressed and visually inspected before preview capture. Regenerate assets and preview screenshots when compression artifacts, faces, text, logos, watermarks, or crop artifacts make the package unsuitable for publication;
 - advertised features in `theme.toml`, README, or visible UI should be implemented and tested.
 
 Keep optional advanced features scoped. Do not add a Tailwind/npm pipeline, search engine, comments, PWA, or multilingual system only because a comparison theme has one; add them when the design, target audience, or publishing goal benefits from the extra surface.
@@ -157,6 +162,8 @@ Do not assume these paths exist in every installation, and do not copy example t
 - Keep navigation, footer links, socials, CTA labels, and hero content configurable through site params when practical.
 - Use Hugo image/resource pipelines for theme-owned assets that need fingerprinting, minification, resizing, or Sass compilation.
 - Read replaceable presentation images from `.Site.Params`, page `.Params`, page resources, or data files with fallback defaults. Avoid template-only literals such as `/images/specific-person.jpg` for hero/about/avatar/profile imagery in reusable themes.
+- Normalize user-provided static image params before applying `relURL` or `absURL`; README/config/front matter examples should use `images/foo.jpg` instead of `/images/foo.jpg` so subpath deployments keep working. Avoid template literals such as `{{ "/images/foo.jpg" | relURL }}`; pass relative inputs or trim leading slashes first.
+- In code block render hooks, preserve language metadata but escape fenced code content. Use `{{ .Inner | htmlEscape | safeHTML }}` if the hook needs `safeHTML`; never render fenced code as raw trusted HTML.
 - Prefer semantic HTML landmarks: `header`, `nav`, `main`, `article`, `section`, `aside`, `footer`.
 - Use `.IsHome`, `.Kind`, `.Section`, `.Type`, `.Params`, `.Site.Params`, menus, taxonomies, and partial dicts intentionally instead of duplicating templates.
 - When the homepage design highlights a specific article/project, support an explicit front matter flag such as `featured = true` instead of assuming the latest dated content should appear first.
@@ -212,6 +219,17 @@ Do not commit `exampleSite/public/` or `.hugo_build.lock` by default. They are b
 ```bash
 hugo --source exampleSite --themesDir .. --theme <theme-folder-name> --destination /tmp/<theme-folder-name>-public --noBuildLock
 ```
+
+For publishable themes, also run a subpath build:
+
+```bash
+hugo --source exampleSite --themesDir .. --theme <theme-folder-name> --baseURL https://example.org/blog/ --destination /tmp/<theme-folder-name>-subpath --noBuildLock
+```
+
+After a subpath build, inspect generated HTML for root-relative asset URLs such
+as `src="/js/app.js"` or `href="/css/site.css"`. Internal content links may be
+intentionally absolute, but theme assets should not escape the configured
+subpath.
 
 4. If working inside a full Hugo site with `themes/<theme>`, build from the site root:
 
