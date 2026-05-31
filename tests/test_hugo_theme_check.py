@@ -293,6 +293,86 @@ class HugoThemeCheckTests(unittest.TestCase):
             self.assertTrue(any("localizable through i18n" in message for message in messages))
             self.assertTrue(any("layouts should render" in message for message in messages))
 
+    def test_favicon_publication_warns_for_manifest_without_android_icons(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            theme = Path(tmp)
+            (theme / "static").mkdir()
+            (theme / "static" / "site.webmanifest").write_text('{"name":"Demo"}\n', encoding="utf-8")
+            (theme / "README.md").write_text(
+                "Demo favicon files can be overridden by placing files with the same names in the site static/ directory.\n",
+                encoding="utf-8",
+            )
+            result = {"warnings": [], "info": [], "errors": []}
+
+            hugo_theme_check.check_favicon_publication(result, theme)
+
+            messages = [warning["message"] for warning in result["warnings"]]
+            self.assertTrue(any("android-chrome-192x192.png" in message for message in messages))
+            self.assertTrue(any("android-chrome-512x512.png" in message for message in messages))
+
+    def test_favicon_publication_warns_for_missing_head_link_asset(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            theme = Path(tmp)
+            (theme / "layouts" / "_partials").mkdir(parents=True)
+            (theme / "layouts" / "_partials" / "head.html").write_text(
+                '<link rel="icon" href="{{ `favicon-32x32.png` | relURL }}" sizes="32x32" />\n',
+                encoding="utf-8",
+            )
+            (theme / "README.md").write_text(
+                "Demo favicon files can be overridden by placing files with the same names in the site static/ directory.\n",
+                encoding="utf-8",
+            )
+            result = {"warnings": [], "info": [], "errors": []}
+
+            hugo_theme_check.check_favicon_publication(result, theme)
+
+            self.assertTrue(any("static/favicon-32x32.png" in warning["message"] for warning in result["warnings"]))
+
+    def test_favicon_publication_warns_when_override_docs_missing(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            theme = Path(tmp)
+            (theme / "static").mkdir()
+            (theme / "static" / "favicon.ico").write_bytes(b"ico")
+            result = {"warnings": [], "info": [], "errors": []}
+
+            hugo_theme_check.check_favicon_publication(result, theme)
+
+            self.assertTrue(any("README should document" in warning["message"] for warning in result["warnings"]))
+
+    def test_favicon_publication_accepts_complete_demo_set(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            theme = Path(tmp)
+            (theme / "layouts" / "_partials").mkdir(parents=True)
+            (theme / "static").mkdir()
+            (theme / "static" / "favicon.ico").write_bytes(b"ico")
+            write_png(theme / "static" / "favicon-16x16.png", 16, 16, varied=True)
+            write_png(theme / "static" / "favicon-32x32.png", 32, 32, varied=True)
+            write_png(theme / "static" / "apple-touch-icon.png", 180, 180, varied=True)
+            write_png(theme / "static" / "android-chrome-192x192.png", 192, 192, varied=True)
+            write_png(theme / "static" / "android-chrome-512x512.png", 512, 512, varied=True)
+            (theme / "static" / "site.webmanifest").write_text('{"name":"Demo"}\n', encoding="utf-8")
+            (theme / "layouts" / "_partials" / "head.html").write_text(
+                "\n".join(
+                    [
+                        '<link rel="icon" href="{{ `favicon.ico` | relURL }}" sizes="any" />',
+                        '<link rel="icon" type="image/png" sizes="32x32" href="{{ `favicon-32x32.png` | relURL }}" />',
+                        '<link rel="icon" type="image/png" sizes="16x16" href="{{ `favicon-16x16.png` | relURL }}" />',
+                        '<link rel="apple-touch-icon" sizes="180x180" href="{{ `apple-touch-icon.png` | relURL }}" />',
+                        '<link rel="manifest" href="{{ `site.webmanifest` | relURL }}" />',
+                    ]
+                ),
+                encoding="utf-8",
+            )
+            (theme / "README.md").write_text(
+                "Demo favicon files can be overridden by placing files with the same names in the site static/ directory.\n",
+                encoding="utf-8",
+            )
+            result = {"warnings": [], "info": [], "errors": []}
+
+            hugo_theme_check.check_favicon_publication(result, theme)
+
+            self.assertEqual(result["warnings"], [])
+
     def test_telegram_instant_view_ignored_when_not_declared(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             theme = Path(tmp)

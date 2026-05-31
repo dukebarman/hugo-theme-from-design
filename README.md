@@ -4,6 +4,8 @@ Codex skill for creating, updating, and repairing Hugo themes from design refere
 
 The skill is aimed at turning a visual design into a reusable Hugo theme package, not just a static screenshot match. It guides Codex through theme scaffolding, `exampleSite` generation, Hugo build validation, preview image capture, and package-readiness checks for public theme repositories, including configurable footer attribution.
 
+For publishable themes, the skill also guides neutral demo favicon/webmanifest assets when the theme owns `<head>` metadata. Favicons should use a simplified high-contrast mark that remains readable at 16x16 and 32x32, not a tiny crop of a detailed hero image.
+
 For publishable blog, magazine, documentation, and long-form article themes, the skill can also prepare renderer-friendly article markup for Telegram Instant View and similar extractors. This is optional: the generated theme can expose stable selectors and a sample IV template, but Telegram Instant View must still be configured and validated per live domain in Telegram's editor.
 
 ## When to use it
@@ -92,6 +94,11 @@ Run publication-oriented checks:
 python3 scripts/hugo_theme_check.py --theme-dir /path/to/theme --publication
 ```
 
+Publication checks include warning-level favicon/webmanifest checks: missing
+manifest companion icons, missing files referenced from favicon links in head
+partials, missing README override documentation, and basic sanity checks for
+`favicon-16x16.png` and `favicon-32x32.png`.
+
 When a theme declares Telegram Instant View support in its README or includes
 `docs/telegram-instant-view.tpl`, publication checks emit warning-level
 guidance for stable article selectors, article metadata, image metadata, README
@@ -123,6 +130,29 @@ python3 -m unittest discover -s tests
 Keep `SKILL.md` focused on instructions Codex should follow during task execution. Put longer background material, checklists, and research notes in `references/` so the skill can load them only when relevant.
 
 When updating helper scripts, add or update focused tests under `tests/` and run the full unittest suite before publishing changes.
+
+## Favicons And Webmanifest
+
+For publishable themes that own `<head>` metadata, the recommended neutral demo
+favicon set is:
+
+- `static/favicon.ico`
+- `static/favicon-16x16.png`
+- `static/favicon-32x32.png`
+- `static/apple-touch-icon.png`
+- `static/android-chrome-192x192.png`
+- `static/android-chrome-512x512.png`
+- `static/site.webmanifest`
+
+The head partial should link these files with `relURL`, including `rel="icon"`,
+`rel="apple-touch-icon"`, and `rel="manifest"` entries. Treat them as demo
+assets: site owners should be able to replace them by placing files with the
+same names in their site `static/` directory.
+
+Use a simplified mark from the theme's demo visual language. Avoid real people,
+personal identifiers, readable text, logos, trademarks, and watermarks. Inspect
+the rendered 16x16 and 32x32 files directly and simplify or regenerate if the
+icon becomes a dark blob, loses its silhouette, or depends on fine detail.
 
 ## Telegram Instant View
 

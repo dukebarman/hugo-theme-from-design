@@ -43,10 +43,36 @@ ROOT_SUPPORT_CONTENT_FILES = {"manifest.md"}
 FAVICON_CANDIDATES = [
     "static/favicon.ico",
     "static/favicon.svg",
+    "static/favicon-16x16.png",
+    "static/favicon-32x32.png",
+    "static/apple-touch-icon.png",
+    "static/android-chrome-192x192.png",
+    "static/android-chrome-512x512.png",
+    "static/site.webmanifest",
     "assets/icons/favicon.ico",
     "assets/icons/favicon.svg",
     "assets/icons/site.webmanifest",
 ]
+FAVICON_DEMO_FILES = (
+    "favicon.ico",
+    "favicon-16x16.png",
+    "favicon-32x32.png",
+    "apple-touch-icon.png",
+    "android-chrome-192x192.png",
+    "android-chrome-512x512.png",
+    "site.webmanifest",
+)
+FAVICON_SMALL_PNGS = {
+    "favicon-16x16.png": (16, 16),
+    "favicon-32x32.png": (32, 32),
+}
+FAVICON_LINK_TAG_RE = re.compile(r"<link\b[^>]*>", re.IGNORECASE | re.DOTALL)
+HTML_ATTR_RE = re.compile(r"""([\w:-]+)\s*=\s*(['"])(.*?)\2""", re.IGNORECASE | re.DOTALL)
+FAVICON_HREF_RE = re.compile(
+    r"""(?:^|[`'"/\s])(?P<path>(?:[A-Za-z0-9_.-]+/)*(?:favicon\.ico|favicon\.svg|favicon-16x16\.png|favicon-32x32\.png|apple-touch-icon\.png|android-chrome-192x192\.png|android-chrome-512x512\.png|site\.webmanifest))(?:$|[`'")\s?])""",
+    re.IGNORECASE,
+)
+FAVICON_OVERRIDE_TERMS = ("override", "replace", "same name", "same-name", "same names", "same-named")
 MAX_PREVIEW_IMAGE_BYTES = 25 * 1024 * 1024
 MAX_PREVIEW_PIXELS = 12_000_000
 MARKDOWN_LINK_RE = re.compile(r"(?<!!)\[[^\]]+\]\(([^)\s]+)(?:\s+\"[^\"]*\")?\)")
@@ -546,6 +572,82 @@ def check_footer_theme_attribution(result: dict, theme_dir: Path) -> None:
         add(result, "warnings", "Publication check: layouts should render footer theme attribution behind params.footer.showThemeAttribution")
 
 
+def favicon_asset_path(theme_dir: Path, href_path: str) -> Path:
+    clean = href_path.strip().lstrip("/")
+    if clean.startswith("static/"):
+        clean = clean.removeprefix("static/")
+    return theme_dir / "static" / clean
+
+
+def extract_favicon_href_path(href: str) -> str | None:
+    if href.startswith(("http://", "https://", "//", "data:")):
+        return None
+    match = FAVICON_HREF_RE.search(href)
+    if not match:
+        return None
+    return match.group("path")
+
+
+def favicon_links_from_layouts(theme_dir: Path) -> list[tuple[Path, str]]:
+    links: list[tuple[Path, str]] = []
+    for path, text in collect_text_from_roots([theme_dir / "layouts"]).items():
+        for tag in FAVICON_LINK_TAG_RE.finditer(text):
+            attrs = {match.group(1).lower(): match.group(3) for match in HTML_ATTR_RE.finditer(tag.group(0))}
+            rel = attrs.get("rel", "").lower()
+            if "icon" not in rel and "manifest" not in rel:
+                continue
+            href = attrs.get("href", "")
+            href_path = extract_favicon_href_path(href)
+            if href_path:
+                links.append((path, href_path))
+    return links
+
+
+def readme_documents_favicon_override(theme_dir: Path) -> bool:
+    text = "\n".join(readme_texts(theme_dir).values()).lower()
+    if not text:
+        return False
+    return "favicon" in text and "static" in text and any(term in text for term in FAVICON_OVERRIDE_TERMS)
+
+
+def check_favicon_publication(result: dict, theme_dir: Path) -> None:
+    static_manifest = theme_dir / "static" / "site.webmanifest"
+    if static_manifest.exists():
+        for filename in ("android-chrome-192x192.png", "android-chrome-512x512.png"):
+            path = theme_dir / "static" / filename
+            if not path.exists():
+                add(result, "warnings", f"Publication check: static/site.webmanifest should be paired with static/{filename}", path)
+
+    links = favicon_links_from_layouts(theme_dir)
+    for source, href_path in links:
+        asset = favicon_asset_path(theme_dir, href_path)
+        if not asset.exists():
+            add(result, "warnings", f"Publication check: head references missing favicon/webmanifest asset: static/{href_path}", source)
+
+    has_favicon_assets = any((theme_dir / "static" / filename).exists() for filename in FAVICON_DEMO_FILES)
+    if (has_favicon_assets or links) and not readme_documents_favicon_override(theme_dir):
+        add(
+            result,
+            "warnings",
+            "Publication check: README should document that demo favicon files can be overridden from the site static/ directory",
+        )
+
+    for filename, expected in FAVICON_SMALL_PNGS.items():
+        path = theme_dir / "static" / filename
+        if not path.exists():
+            continue
+        size = image_size(path)
+        if size is None:
+            add(result, "warnings", f"Publication check: unable to read static/{filename} dimensions", path)
+            continue
+        if size != expected:
+            add(result, "warnings", f"Publication check: static/{filename} is {size[0]}x{size[1]}; expected {expected[0]}x{expected[1]}", path)
+            continue
+        pixel_ok, pixel_message = png_pixel_sanity(path)
+        if pixel_ok is False:
+            add(result, "warnings", f"Publication check: static/{filename} {pixel_message}", path)
+
+
 def readme_texts(theme_dir: Path) -> dict[Path, str]:
     texts: dict[Path, str] = {}
     for name in README_FILES:
@@ -703,6 +805,7 @@ def main() -> int:
                 add(result, "warnings", "Publication check: missing RSS layout", layouts_dir)
             if not any_exists(theme_dir, FAVICON_CANDIDATES):
                 add(result, "warnings", "Publication check: no favicon or webmanifest asset detected")
+            check_favicon_publication(result, theme_dir)
             check_hardcoded_replaceable_images(result, theme_dir)
             check_footer_theme_attribution(result, theme_dir)
             check_telegram_instant_view(result, theme_dir)

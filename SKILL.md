@@ -85,6 +85,29 @@ Keep generated demo content credible but lightweight. Do not put built output su
 
 For quick design tests, keep the theme focused and small. For a publishable GitHub theme or a theme intended for `themes.gohugo.io`, read the production checklist in `references/hugo-theme-notes.md` and add the expected package surface: README, license, richer `exampleSite`, favicon/webmanifest assets, 404/RSS/templates, responsive mobile navigation, code styles when posts include code, footer theme attribution, and documented params.
 
+For publishable themes, include a neutral demo favicon set when the theme owns `<head>` metadata:
+- `static/favicon.ico`;
+- `static/favicon-16x16.png`;
+- `static/favicon-32x32.png`;
+- `static/apple-touch-icon.png`;
+- `static/android-chrome-192x192.png`;
+- `static/android-chrome-512x512.png`;
+- `static/site.webmanifest`.
+
+Prefer a simplified high-contrast mark over cropping a detailed hero image. The favicon must remain recognizable at 16x16 and 32x32. Use the generated/demo visual language, but avoid real people, personal identifiers, readable text, logos, trademarks, and watermarks.
+
+Wire the icons in the head partial:
+
+```html
+<link rel="icon" href="{{ `favicon.ico` | relURL }}" sizes="any" />
+<link rel="icon" type="image/png" sizes="32x32" href="{{ `favicon-32x32.png` | relURL }}" />
+<link rel="icon" type="image/png" sizes="16x16" href="{{ `favicon-16x16.png` | relURL }}" />
+<link rel="apple-touch-icon" sizes="180x180" href="{{ `apple-touch-icon.png` | relURL }}" />
+<link rel="manifest" href="{{ `site.webmanifest` | relURL }}" />
+```
+
+Document that these are demo assets and that site owners can override them by placing files with the same names in their site `static/` directory.
+
 For publishable blog, magazine, documentation, or long-form article themes, make article pages friendly to external article renderers such as Telegram Instant View: stable article selectors, removable UI chrome markers, article metadata, cover support, figure captions, and code-block language metadata. Do not imply that Instant View is automatic; Telegram IV templates are configured and validated per live domain.
 
 Do not confuse a visually plausible prototype with a reusable theme product. When the user compares against a mature human-made theme or plans to publish the result, graduate the implementation beyond screenshot matching:
@@ -98,6 +121,8 @@ Do not confuse a visually plausible prototype with a reusable theme product. Whe
 - generate preview screenshots from the rendered theme when a browser screenshot tool is available instead of drawing schematic placeholder previews.
 
 When generating demo assets for a publishable theme, keep prompts publication-safe: explicitly exclude real people, personal identifiers, readable text, logos, trademarks, and watermarks unless the user provided licensed assets and requested them. After generation, visually inspect the asset, regenerate if artifacts or prohibited details appear, then regenerate `images/screenshot.png` and `images/tn.png` from the rendered theme preview.
+
+When generating favicon assets, visually inspect at least 32x32 and 16x16. Regenerate or simplify if the icon becomes an indistinct dark blob, loses its silhouette, or depends on text or fine detail.
 
 ## Telegram Instant View Support
 
@@ -170,6 +195,7 @@ Read `references/ux-ui-checklist.md` before final visual verification. Treat it 
 - first match the design reference;
 - then check responsive behavior, accessibility, interaction states, content density, and Hugo-specific authoring ergonomics;
 - do not add marketing copy or feature explanations unless the design calls for them.
+- for generated favicon assets, inspect the 32x32 and 16x16 outputs as actual small icons; simplify or regenerate if they become indistinct blobs, lose their silhouette, or rely on text/fine detail.
 
 Use browser screenshots when a local server can run. Prefer whatever headless browser is available in the environment, such as Playwright, Chromium/Chrome, Firefox, WebKit, or another browser already installed by the project. Check desktop and mobile widths. Before capturing, preflight the requested URL with an HTTP/HTML check and capture the final page when the root responds with an HTTP redirect, meta refresh, or same-origin canonical URL. For multilingual sites with `defaultContentLanguageInSubdir = true`, do not assume `/` is the usable preview page; determine and capture the rendered language URL such as `/en/` or `/ru/`. If Firefox on macOS is used while a regular Firefox session is open, run it with a temporary profile, for example `firefox --headless --profile /tmp/<profile> --screenshot /tmp/<theme>.png --window-size 1440,1000 <url>`. If Firefox headless produces a blank or invalid screenshot under sandboxing, repeat with an approved regular headless Firefox command and inspect the resulting image before trusting it. If no browser screenshot tool is available, report that visual verification was limited to Hugo build, rendered HTML, and CSS/DOM inspection. Fix text overflow, overlapping UI, broken image crops, illegible contrast, broken controls, and navigation states.
 
