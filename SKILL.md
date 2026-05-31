@@ -11,7 +11,7 @@ license: Apache-2.0
 Default to generating a new theme variant from the design reference. Update or migrate an existing/old theme only when the user explicitly asks, when the task is framed as a repair, or when the repository clearly has a single theme that must be preserved.
 
 1. Establish the target: new variant, port/reimplementation of a known theme, update to an existing theme, migration from an old theme, or repair. Identify the design source (Figma, PNG/JPG screenshot, design tokens, existing site) and the expected Hugo version/content model. Treat downloaded or user-supplied themes as a reference corpus by default: learn quality patterns from them without asking for compatibility. Ask one concise clarification only when a specific existing theme is the requested target and it is unclear whether the user wants a visually inspired new variant or a compatible port preserving that theme's public API.
-2. Inspect the repository before editing: `hugo version`, `find . -maxdepth 3`, theme `layouts/`, `assets/`, `static/`, `content/`, `data/`, `i18n/`, config files, `theme.toml`, and any `exampleSite`. Detect whether the theme uses the modern Hugo template layout (`layouts/_partials`, root `baseof.html`, `home.html`, `page.html`, `section.html`) or legacy-compatible layout (`layouts/partials`, `layouts/_default/*`).
+2. Inspect the repository before editing: `hugo version`, `find . -maxdepth 3`, theme `layouts/`, `assets/`, `static/`, `content/`, `data/`, `i18n/`, config files, `theme.toml`, and any `exampleSite`. Detect whether the theme uses the modern Hugo template layout (`layouts/_partials`, root `baseof.html`, `home.html`, `page.html`, `section.html`) or legacy-compatible layout (`layouts/partials`, `layouts/_default/*`). If a site contains `themes/<name>/.git`, check both repository states with `git status --short` at the site root and `git -C themes/<name> status --short`, then decide whether each change belongs to the site layer, the theme layer, or both.
 3. If creating the default new variant, prefer `hugo new theme <variant-name>` when Hugo is installed. Run it from the intended site/repository root or pass paths deliberately, then verify the created directory is exactly the target theme path before editing. Preserve Hugo's generated skeleton and build on top of it instead of inventing a custom structure.
 4. Separate the actual website UI from presentation context. If a PNG/JPG shows a browser window, device mockup, gradient poster background, drop shadow, or gallery frame around the site, treat those as preview/presentation chrome unless the user explicitly asks to make them part of the live theme.
 5. Translate the design into Hugo boundaries:
@@ -51,6 +51,14 @@ When themes are only examples, use them as a quality reference, not as a public 
 
 For old-theme updates, preserve URLs, front matter contracts, params, translations, shortcodes, and documented customization points unless the user approves a breaking change. Migrate template conventions only when required, update/add `exampleSite` to catch regressions, and summarize old-to-new mappings in the final answer.
 
+## Site Overrides Vs Theme Defaults
+
+When repairing or updating an existing Hugo site that uses a theme, identify the layer actually consumed by the template before editing copy, links, or images. Trace the value from the template expression to `.Site.Params`, `i18n`, page front matter/content, `data/`, theme defaults, or `exampleSite` config, and verify the rendered HTML after the change.
+
+Keep site-specific copy, social links, hero/about text, profile data, and production URLs in the site layer whenever the template supports it: root config, site `i18n/`, site `content/`, or site `data/`. Change `themes/<theme>/i18n/`, default params, or theme demo content only for reusable theme defaults, fallback strings, or `exampleSite` behavior. Do not assume editing a theme-level i18n key affects the live site; site params and site i18n can override or bypass it.
+
+If visible text is assembled from multiple params or i18n keys, such as prefix/accent/suffix hero copy, inspect the final rendered sentence in each affected language. Check grammar, punctuation, wrapping, and whether the intended key is used rather than merely present in an unused translation file.
+
 ## ExampleSite Generation
 
 For every new theme variant, create `exampleSite/` inside the theme. Include config, homepage content, representative sections, menus/params/taxonomies, and enough Markdown/front matter to exercise home, list, single, taxonomy, pagination, media, navigation, footer, and long/empty states.
@@ -69,7 +77,8 @@ Do not confuse a visually plausible prototype with a reusable theme product. Whe
 - make prominent theme images replaceable. Do not hard-code hero, avatar, about, profile, or social preview paths such as `/images/specific-person.jpg` directly into templates as the only source. Read them from `params`, front matter, page resources, or data files with documented fallback defaults, for example `params.heroImage`, `params.aboutImage`, `params.avatar`, and `params.images`;
 - keep user-facing URLs subpath-safe. In README examples, config params, archetypes, and front matter prefer `images/foo.jpg`, `posts/foo/`, and `tags/news/` over `/images/foo.jpg`, `/posts/foo/`, and `/tags/news/`; when template code receives a user path before `relURL`, `relLangURL`, `absURL`, or `absLangURL`, normalize accidental leading slashes so a non-root `baseURL` such as `https://example.org/blog/` still works;
 - add an unobtrusive publication footer attribution for reusable themes, separate from site author/copyright: `Theme <ThemeName> by <ThemeAuthor>.` Enable it by default, make it disableable through `params.footer.showThemeAttribution`, localize the sentence through i18n, support separate `themeURL` and `themeAuthorURL`, and document the params in README;
-- add search, comments, PWA, i18n, analytics, or shortcodes only when requested or implied, but make advertised features actually work;
+- add search, comments, PWA, i18n, analytics, social providers, or shortcodes only when requested or implied, but make advertised features actually work;
+- when adding a social link/provider, update the icon branch or icon map, fallback text, label, `aria-label`, and `title` behavior; then check every place social links render, including header/footer/about sections, RSS or metadata appenders, and templates that limit display to the first N links;
 - generate preview screenshots from the rendered theme when a browser screenshot tool is available instead of drawing schematic placeholder previews.
 
 For publishable demo assets, exclude real people, personal identifiers, readable text, logos, trademarks, and watermarks unless the user supplied licensed assets. Compress large demo images, prefer JPEG/WebP for large illustrations, inspect favicon outputs at 32x32 and 16x16, and regenerate rendered `images/screenshot.png` and `images/tn.png` after asset changes.
@@ -112,7 +121,7 @@ Use these commands as the baseline:
 hugo version
 hugo new theme <theme-name>
 hugo --source <site-or-exampleSite> --theme <theme-name> --destination /tmp/<theme-name>-public --noBuildLock
-hugo server --source <site-or-exampleSite> --theme <theme-name> --disableFastRender --renderToMemory --noBuildLock
+hugo server --source <site-or-exampleSite> --theme <theme-name> --bind 127.0.0.1 --baseURL http://127.0.0.1:1313/ --disableFastRender --renderToMemory --noBuildLock
 ```
 
 For standalone theme repositories, build the included `exampleSite` when present. For new variants, create `exampleSite` before final validation. For old themes without `exampleSite`, either add one as part of the migration/update or clearly report why it was out of scope.
@@ -129,6 +138,25 @@ Adjust `--themesDir` to the repository layout, such as `../..` when the theme li
 After running Hugo commands, check that `exampleSite/public/` and `exampleSite/.hugo_build.lock` were not left in the deliverable. Remove these build artifacts before finalizing unless the user explicitly asked to keep generated output.
 
 When delivering a full site plus theme, set the theme in site config (`theme = "<theme-name>"` or the equivalent YAML/JSON) unless the project intentionally uses `--theme` or Hugo Modules.
+
+## Local Site Validation
+
+For visual checks of an existing site, especially when its production config has a real `baseURL`, run the local server with an explicit local base URL and in-memory rendering:
+
+```bash
+hugo server -D --bind 127.0.0.1 --baseURL http://127.0.0.1:1313/ --renderToMemory --noBuildLock
+```
+
+If the site needs an explicit theme or source path, add the existing project flags such as `--source`, `--theme`, or `--themesDir` without dropping `--baseURL http://127.0.0.1:1313/` or `--renderToMemory`. Do not trust a browser screenshot until you smoke-check that local HTML is not loading CSS, JavaScript, or image assets from the configured production host:
+
+```bash
+curl -s http://127.0.0.1:1313/ | rg "https?://<production-host>|stylesheet|script src|images/"
+curl -I http://127.0.0.1:1313/css/<known-file>.css
+```
+
+For multilingual sites, smoke-check the affected language branches and pages, such as `/ru/`, `/ru/about/`, `/en/`, and `/en/about/`. Grep the rendered HTML for changed copy or links so unused params and unused i18n keys are caught before visual review.
+
+Keep production builds separate from local server validation. Use `hugo server --renderToMemory` for visual checks, run `hugo --gc --minify` or other production builds separately, and treat generated `public/` output as build output unless the user explicitly asked to edit committed generated files.
 
 ## UX/UI Review
 

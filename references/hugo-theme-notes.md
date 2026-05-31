@@ -40,6 +40,7 @@ For ports/reimplementations of known themes:
 - keep license and attribution aligned with the upstream theme;
 - prefer the upstream package architecture when recognizable, such as Poole/Hyde split CSS, print/syntax CSS, theme color classes, reverse-layout params, or Hugo Module metadata;
 - preserve public configuration names, widget order/options, content section names, taxonomy names, extension partials, shortcodes, and documented build tooling when users expect compatibility;
+- for existing sites, trace site-level overrides before editing theme defaults: root config, site `i18n/`, site `content/`, and site `data/` can override or bypass theme-level defaults;
 - distinguish source dependencies from runtime dependencies: a theme may require Tailwind/npm/Pagefind for development or indexing while still rendering as static output after build;
 - do not migrate legacy `_default`/`partials` structure just to satisfy new-theme conventions;
 - `exampleSite` is useful but not mandatory when the port's established package style omits it. In that case, document a minimal build command or provide a separate demo site when requested.
@@ -57,6 +58,7 @@ For GitHub publication, also prefer:
 - documented params such as `mainSections`, `dateFormat`, `defaultColor`, author/avatar/social fields, footer, and optional analytics/comments.
 - publication-safe generated demo assets: no real people, personal identifiers, readable text, logos, trademarks, or watermarks unless supplied as licensed user assets.
 - compressed demo images: avoid large PNG/JPG files over roughly 1 MB in `static/images` unless there is a deliberate visual need; prefer JPEG/WebP for large demo illustrations.
+- social providers render with real icons or a documented fallback, accessible labels, and consistent behavior in every surface that displays social links.
 
 Recommended footer attribution config:
 
@@ -240,10 +242,25 @@ internal navigation should not escape the configured subpath.
 hugo --theme <theme-folder-name>
 ```
 
-5. For visual review, run:
+5. For visual review, run a local server with an explicit local base URL and in-memory rendering:
 
 ```bash
-hugo server --source exampleSite --themesDir .. --theme <theme-folder-name> --disableFastRender --renderToMemory --noBuildLock
+hugo server -D --bind 127.0.0.1 --baseURL http://127.0.0.1:1313/ --renderToMemory --noBuildLock
+```
+
+Smoke-check that local HTML is not loading CSS, JavaScript, or image assets from the production host:
+
+```bash
+curl -s http://127.0.0.1:1313/ | rg "https?://<production-host>|stylesheet|script src|images/"
+curl -I http://127.0.0.1:1313/css/<known-file>.css
+```
+
+For multilingual sites, request representative language URLs and grep the rendered HTML for changed strings or links. This catches edits made to unused params or unused i18n keys.
+
+6. For `exampleSite` visual review, run:
+
+```bash
+hugo server --source exampleSite --themesDir .. --theme <theme-folder-name> --bind 127.0.0.1 --baseURL http://127.0.0.1:1313/ --disableFastRender --renderToMemory --noBuildLock
 ```
 
 Adjust paths to match the repository. If the existing project uses Hugo Modules instead of `themesDir`, follow its module config.
