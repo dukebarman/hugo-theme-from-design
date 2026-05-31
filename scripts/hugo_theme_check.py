@@ -38,6 +38,7 @@ CONFIG_DIR_FILES = (
 )
 README_FILES = ["README.md", "README.markdown", "README"]
 LICENSE_FILES = ["LICENSE", "LICENSE.md", "COPYING"]
+COPYRIGHT_NOTICE_FILES = ["NOTICE", "NOTICE.md", "COPYRIGHT", "COPYRIGHT.md"]
 ROOT_SUPPORT_CONTENT_DIRS = {"search"}
 ROOT_SUPPORT_CONTENT_FILES = {"manifest.md"}
 FAVICON_CANDIDATES = [
@@ -333,6 +334,11 @@ def partials_state(layouts_dir: Path) -> tuple[str | None, Path | None, bool]:
 
 def any_exists(base: Path, candidates: list[str]) -> bool:
     return any((base / candidate).exists() for candidate in candidates)
+
+
+def license_prefers_notice_file(metadata: dict) -> bool:
+    license_name = str(metadata.get("license", "")).lower()
+    return any(term in license_name for term in ("apache", "gpl", "agpl", "lgpl"))
 
 
 def has_hugo_config(base: Path) -> bool:
@@ -1105,6 +1111,7 @@ def main() -> int:
         elif partials_kind == "legacy":
             add(result, "info", "Legacy Hugo partials directory detected: layouts/partials", partials_path)
 
+        metadata: dict = {}
         theme_toml = theme_dir / "theme.toml"
         if not theme_toml.exists():
             add(result, "warnings", "Missing theme.toml; required for themes.gohugo.io submissions", theme_toml)
@@ -1132,6 +1139,12 @@ def main() -> int:
                 add(result, "warnings", "Publication check: missing README.md")
             if not any_exists(theme_dir, LICENSE_FILES):
                 add(result, "warnings", "Publication check: missing LICENSE file")
+            elif license_prefers_notice_file(metadata) and not any_exists(theme_dir, COPYRIGHT_NOTICE_FILES):
+                add(
+                    result,
+                    "warnings",
+                    "Publication check: Apache/GPL-style licenses should keep the standard license text in LICENSE/COPYING and put copyright or attribution notices in NOTICE or COPYRIGHT",
+                )
             if not layout_exists(layouts_dir, ("404.html", "_default/404.html")):
                 add(result, "warnings", "Publication check: missing 404 layout", layouts_dir)
             if not layout_exists(layouts_dir, ("_default/rss.xml", "rss.xml")):

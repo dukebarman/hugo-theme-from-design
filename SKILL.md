@@ -59,7 +59,7 @@ For reusable packages, keep demos neutral: a fictional person/studio/lab/product
 
 ## Production Readiness
 
-For quick design tests, keep the theme focused and small. For GitHub/themes.gohugo.io publication, read `references/hugo-theme-notes.md` and add the expected package surface: README, license, theme metadata, richer `exampleSite`, preview images, favicon/webmanifest when the theme owns `<head>`, 404/RSS, responsive navigation, code styles, footer theme attribution, documented params, subpath-safe internal links/assets, and no CDN dependencies in theme-owned head output.
+For quick design tests, keep the theme focused and small. For GitHub/themes.gohugo.io publication, read `references/hugo-theme-notes.md` and add the expected package surface: README, standard license file, separate copyright/attribution notices for Apache/GPL-style licenses, theme metadata, richer `exampleSite`, preview images, favicon/webmanifest when the theme owns `<head>`, 404/RSS, responsive navigation, code styles, footer theme attribution, documented params, subpath-safe internal links/assets, and no CDN dependencies in theme-owned head output.
 
 Do not confuse a visually plausible prototype with a reusable theme product. When the user compares against a mature human-made theme or plans to publish the result, graduate the implementation beyond screenshot matching:
 - replace decorative or placeholder UI with working Hugo behavior, or remove controls that are only visual;

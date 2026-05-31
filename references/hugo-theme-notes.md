@@ -17,7 +17,8 @@ For themes intended for `themes.gohugo.io`, check:
 - root `theme.toml` with name, license, licenselink, description, homepage, tags, features, and author/original metadata where applicable;
 - Hugo compatibility metadata, preferably `[module.hugoVersion]` with `extended`, `min`, and optionally `max`;
 - `README.md`, ideally with English documentation;
-- open-source license file;
+- open-source license file, using the standard upstream license text for Apache/GPL-style licenses;
+- separate copyright and attribution notices in `NOTICE`, `NOTICE.md`, `COPYRIGHT`, or `COPYRIGHT.md` when the license text should stay standard, especially for Apache/GPL-style licenses;
 - `images/screenshot.png` or `.jpg`, 3:2 ratio, minimum `1500x1000`;
 - `images/tn.png` or `.jpg`, 3:2 ratio, minimum `900x600`;
 - preview images show the actual theme without browser/device mockups;
@@ -47,7 +48,7 @@ For GitHub publication, also prefer:
 
 - clean `.gitignore` excluding `.DS_Store`, Python caches, Hugo build output, `exampleSite/public/`, `.hugo_build.lock`, and generated resource caches;
 - `README.md` with install, configuration, screenshots, exampleSite build command, and supported Hugo version;
-- `LICENSE` matching `theme.toml`;
+- `LICENSE` or `COPYING` matching `theme.toml`, with copyright and attribution notices kept in a separate notice file when using Apache/GPL-style standard license text;
 - `CHANGELOG.md` only when versioning/releasing the theme;
 - favicon/webmanifest/icon assets when the theme owns head metadata;
 - 404, RSS, list, single, taxonomy/term, and search/ToC/comment templates when advertised;
