@@ -75,6 +75,8 @@ The minimum useful `exampleSite` includes:
 - enough sample Markdown to exercise home, section/list, page/single, taxonomy/term, pagination, media cards, navigation, footer, and empty/long text states;
 - sample front matter for design-specific fields such as hero images, eyebrow text, CTAs, featured flags, authors, tags, dates, summaries, external links, and gallery assets.
 
+For reusable theme packages, keep the demo neutral. Do not make `exampleSite` a biography or portfolio of the theme author, repository owner, or user unless that is the requested site. Use a fictional person, studio, lab, product, venue, publication, or demo brand that fits the design. Personal names are acceptable only when clearly fictional and not tied to real contact details, usernames, headshots, logos, or personal identifiers.
+
 For multilingual `exampleSite` demos, make language branches complete enough to validate navigation and related-content behavior. If `defaultContentLanguageInSubdir = true`, keep internal demo links inside the same language branch by default, such as `/en/post/` from English pages and `/ru/post/` from Russian pages, unless the design explicitly demonstrates cross-language links.
 
 Keep generated demo content credible but lightweight. Do not put built output such as `public/` or `.hugo_build.lock` into the theme unless the user explicitly wants generated artifacts.
@@ -88,8 +90,11 @@ Do not confuse a visually plausible prototype with a reusable theme product. Whe
 - implement pagination with Hugo pagination APIs when lists can exceed one page;
 - use real icon assets or an icon partial instead of unicode stand-ins for reusable theme UI;
 - make post images robust with page resources/static assets and resizing where practical;
+- make prominent theme images replaceable. Do not hard-code hero, avatar, about, profile, or social preview paths such as `/images/specific-person.jpg` directly into templates as the only source. Read them from `params`, front matter, page resources, or data files with documented fallback defaults, for example `params.heroImage`, `params.aboutImage`, `params.avatar`, and `params.images`;
 - add search, comments, PWA, i18n, analytics, or shortcodes only when requested or implied, but make advertised features actually work;
 - generate preview screenshots from the rendered theme when a browser screenshot tool is available instead of drawing schematic placeholder previews.
+
+When generating demo assets for a publishable theme, keep prompts publication-safe: explicitly exclude real people, personal identifiers, readable text, logos, trademarks, and watermarks unless the user provided licensed assets and requested them. After generation, visually inspect the asset, regenerate if artifacts or prohibited details appear, then regenerate `images/screenshot.png` and `images/tn.png` from the rendered theme preview.
 
 ## Hugo Implementation Rules
 
@@ -123,6 +128,15 @@ hugo server --source <site-or-exampleSite> --theme <theme-name> --disableFastRen
 ```
 
 For standalone theme repositories, build the included `exampleSite` when present. For new variants, create `exampleSite` before final validation. For old themes without `exampleSite`, either add one as part of the migration/update or clearly report why it was out of scope.
+
+For publishable standalone theme packages, run publication validation before finishing:
+
+```bash
+python3 scripts/hugo_theme_check.py --theme-dir /path/to/theme --publication
+hugo --source exampleSite --themesDir .. --theme <theme-folder-name> --destination /tmp/<theme-folder-name>-public --noBuildLock
+```
+
+Adjust `--themesDir` to the repository layout, such as `../..` when the theme lives under a site's `themes/` directory. Confirm `images/screenshot.png`, `images/tn.png`, RSS output, README, LICENSE, and `theme.toml` are present and match the advertised package surface.
 
 After running Hugo commands, check that `exampleSite/public/` and `exampleSite/.hugo_build.lock` were not left in the deliverable. Remove these build artifacts before finalizing unless the user explicitly asked to keep generated output.
 

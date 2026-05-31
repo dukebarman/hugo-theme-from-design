@@ -210,6 +210,35 @@ class HugoThemeCheckTests(unittest.TestCase):
             self.assertEqual(len(result["warnings"]), 1)
             self.assertIn("'en' branch", result["warnings"][0]["message"])
 
+    def test_hardcoded_replaceable_images_warns_for_template_literal(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            theme = Path(tmp)
+            (theme / "layouts" / "_partials").mkdir(parents=True)
+            (theme / "layouts" / "_partials" / "hero.html").write_text(
+                '<img src="/images/specific-person-avatar.jpg" alt="">\n',
+                encoding="utf-8",
+            )
+            result = {"warnings": [], "info": [], "errors": []}
+
+            hugo_theme_check.check_hardcoded_replaceable_images(result, theme)
+
+            self.assertEqual(len(result["warnings"]), 1)
+            self.assertIn("hardcoded replaceable image path", result["warnings"][0]["message"])
+
+    def test_hardcoded_replaceable_images_allows_generic_non_personal_image(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            theme = Path(tmp)
+            (theme / "layouts" / "_partials").mkdir(parents=True)
+            (theme / "layouts" / "_partials" / "card.html").write_text(
+                '<img src="/images/grid-placeholder.jpg" alt="">\n',
+                encoding="utf-8",
+            )
+            result = {"warnings": [], "info": [], "errors": []}
+
+            hugo_theme_check.check_hardcoded_replaceable_images(result, theme)
+
+            self.assertEqual(result["warnings"], [])
+
     def test_publication_warns_about_theme_root_build_artifacts(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             theme = Path(tmp)
