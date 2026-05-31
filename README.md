@@ -193,4 +193,5 @@ documentation: https://instantview.telegram.org/docs/
 
 ## License
 
-Apache-2.0. See [LICENSE](LICENSE).
+Apache-2.0. See [LICENSE](LICENSE) for the standard license text and
+[NOTICE](NOTICE) for copyright and attribution notices.

@@ -756,6 +756,85 @@ class HugoThemeCheckTests(unittest.TestCase):
         self.assertEqual(code, 0)
         self.assertTrue(any("theme root: public" in warning["message"] for warning in payload["warnings"]))
 
+    def test_publication_warns_for_apache_without_notice_file(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            theme = Path(tmp)
+            for directory in ("archetypes", "assets", "content", "data", "i18n", "layouts", "static"):
+                (theme / directory).mkdir(parents=True)
+            (theme / "layouts" / "_partials").mkdir()
+            (theme / "layouts" / "_partials" / "head.html").write_text("", encoding="utf-8")
+            (theme / "layouts" / "home.html").write_text("{{ define \"main\" }}{{ end }}\n", encoding="utf-8")
+            (theme / "hugo.toml").write_text("title = 'Demo'\n", encoding="utf-8")
+            (theme / "theme.toml").write_text(
+                "\n".join(
+                    [
+                        "name = 'Demo'",
+                        "license = 'Apache-2.0'",
+                        "licenselink = 'https://www.apache.org/licenses/LICENSE-2.0'",
+                        "description = 'Demo theme'",
+                        "homepage = 'https://example.org/'",
+                        "min_version = '0.146.0'",
+                    ]
+                ),
+                encoding="utf-8",
+            )
+            (theme / "README.md").write_text("Demo\n", encoding="utf-8")
+            (theme / "LICENSE").write_text("Apache License\n", encoding="utf-8")
+            argv = ["hugo_theme_check.py", "--theme-dir", str(theme), "--publication", "--skip-build"]
+            buffer = io.StringIO()
+
+            with (
+                mock.patch.object(sys, "argv", argv),
+                mock.patch.object(hugo_theme_check.shutil, "which", return_value="/usr/bin/hugo"),
+                mock.patch.object(hugo_theme_check, "run_command", return_value=(0, "hugo v0.161.1")),
+                contextlib.redirect_stdout(buffer),
+            ):
+                code = hugo_theme_check.main()
+
+        payload = json.loads(buffer.getvalue())
+        self.assertEqual(code, 0)
+        self.assertTrue(any("Apache/GPL-style licenses" in warning["message"] for warning in payload["warnings"]))
+
+    def test_publication_accepts_apache_with_notice_file(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            theme = Path(tmp)
+            for directory in ("archetypes", "assets", "content", "data", "i18n", "layouts", "static"):
+                (theme / directory).mkdir(parents=True)
+            (theme / "layouts" / "_partials").mkdir()
+            (theme / "layouts" / "_partials" / "head.html").write_text("", encoding="utf-8")
+            (theme / "layouts" / "home.html").write_text("{{ define \"main\" }}{{ end }}\n", encoding="utf-8")
+            (theme / "hugo.toml").write_text("title = 'Demo'\n", encoding="utf-8")
+            (theme / "theme.toml").write_text(
+                "\n".join(
+                    [
+                        "name = 'Demo'",
+                        "license = 'Apache-2.0'",
+                        "licenselink = 'https://www.apache.org/licenses/LICENSE-2.0'",
+                        "description = 'Demo theme'",
+                        "homepage = 'https://example.org/'",
+                        "min_version = '0.146.0'",
+                    ]
+                ),
+                encoding="utf-8",
+            )
+            (theme / "README.md").write_text("Demo\n", encoding="utf-8")
+            (theme / "LICENSE").write_text("Apache License\n", encoding="utf-8")
+            (theme / "NOTICE").write_text("Copyright 2026 Demo\n", encoding="utf-8")
+            argv = ["hugo_theme_check.py", "--theme-dir", str(theme), "--publication", "--skip-build"]
+            buffer = io.StringIO()
+
+            with (
+                mock.patch.object(sys, "argv", argv),
+                mock.patch.object(hugo_theme_check.shutil, "which", return_value="/usr/bin/hugo"),
+                mock.patch.object(hugo_theme_check, "run_command", return_value=(0, "hugo v0.161.1")),
+                contextlib.redirect_stdout(buffer),
+            ):
+                code = hugo_theme_check.main()
+
+        payload = json.loads(buffer.getvalue())
+        self.assertEqual(code, 0)
+        self.assertFalse(any("Apache/GPL-style licenses" in warning["message"] for warning in payload["warnings"]))
+
 
 if __name__ == "__main__":
     unittest.main()
