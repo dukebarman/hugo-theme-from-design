@@ -69,11 +69,12 @@ jobs:
           data = yaml.safe_load(match.group(1))
           assert isinstance(data, dict), "Frontmatter must be a YAML mapping"
 
-          allowed = {"name", "description", "license", "allowed-tools", "metadata"}
+          allowed = {"name", "description", "allowed-tools", "metadata"}
           extra = set(data) - allowed
           assert not extra, f"Unexpected frontmatter keys: {sorted(extra)}"
 
           assert data.get("name") == "hugo-theme-from-design"
           assert data.get("description")
-          assert data.get("license") == "Apache-2.0"
+          license_text = Path("LICENSE").read_text(encoding="utf-8")
+          assert "Apache License" in license_text and "Version 2.0" in license_text
           PY
