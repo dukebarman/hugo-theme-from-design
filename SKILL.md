@@ -1,16 +1,18 @@
 ---
 name: hugo-theme-from-design
-description: Create, update, and repair Hugo themes from Figma frames, exported design assets, PNG/JPG screenshots, or existing Hugo theme repositories. Use when Codex needs to turn a website design into a Hugo theme, match a Hugo theme to a visual reference, fix Hugo layout/assets issues, scaffold with `hugo new theme`, validate theme metadata, or improve theme UX/UI against a design brief.
-license: Apache-2.0
+description: Create, update, and repair Hugo themes from Figma frames, exported design assets, PNG/JPG screenshots, or existing Hugo theme repositories. Use when the agent needs to turn a website design into a Hugo theme, match a Hugo theme to a visual reference, fix Hugo layout/assets issues, scaffold with `hugo new theme`, validate theme metadata, or improve theme UX/UI against a design brief.
 ---
 
 # Hugo Theme From Design
 
 ## Workflow
 
-Default to generating a new theme variant from the design reference. Update or migrate an existing/old theme only when the user explicitly asks, when the task is framed as a repair, or when the repository clearly has a single theme that must be preserved.
+Default to generating a new theme variant from the design reference. Update or migrate an existing/old theme only when the user explicitly asks, when the task is framed as a repair, or when the repository clearly has a single theme that must be preserved. If the working directory already has exactly one theme under `themes/` and the user did not ask for a new variant, treat that theme as the likely target and ask one concise clarification before scaffolding another theme.
 
-1. Establish the target: new variant, port/reimplementation of a known theme, update to an existing theme, migration from an old theme, or repair. Identify the design source (Figma, PNG/JPG screenshot, design tokens, existing site) and the expected Hugo version/content model. Treat downloaded or user-supplied themes as a reference corpus by default: learn quality patterns from them without asking for compatibility. Ask one concise clarification only when a specific existing theme is the requested target and it is unclear whether the user wants a visually inspired new variant or a compatible port preserving that theme's public API.
+1. Establish the target:
+   - 1a. Classify the task as a new variant, port/reimplementation of a known theme, update to an existing theme, migration from an old theme, or repair.
+   - 1b. Identify the design source (Figma, PNG/JPG screenshot, design tokens, existing site) and the expected Hugo version/content model.
+   - 1c. Treat downloaded or user-supplied themes as a reference corpus by default: learn quality patterns from them without asking for compatibility. Ask one concise clarification only when a specific existing theme is the requested target and it is unclear whether the user wants a visually inspired new variant or a compatible port preserving that theme's public API.
 2. Inspect the repository before editing: `hugo version`, `find . -maxdepth 3`, theme `layouts/`, `assets/`, `static/`, `content/`, `data/`, `i18n/`, config files, `theme.toml`, and any `exampleSite`. Detect whether the theme uses the modern Hugo template layout (`layouts/_partials`, root `baseof.html`, `home.html`, `page.html`, `section.html`) or legacy-compatible layout (`layouts/partials`, `layouts/_default/*`). If a site contains `themes/<name>/.git`, check both repository states with `git status --short` at the site root and `git -C themes/<name> status --short`, then decide whether each change belongs to the site layer, the theme layer, or both.
 3. If creating the default new variant, prefer `hugo new theme <variant-name>` when Hugo is installed. Run it from the intended site/repository root or pass paths deliberately, then verify the created directory is exactly the target theme path before editing. Preserve Hugo's generated skeleton and build on top of it instead of inventing a custom structure.
 4. Separate the actual website UI from presentation context. If a PNG/JPG shows a browser window, device mockup, gradient poster background, drop shadow, or gallery frame around the site, treat those as preview/presentation chrome unless the user explicitly asks to make them part of the live theme.
@@ -53,11 +55,7 @@ For old-theme updates, preserve URLs, front matter contracts, params, translatio
 
 ## Site Overrides Vs Theme Defaults
 
-When repairing or updating an existing Hugo site that uses a theme, identify the layer actually consumed by the template before editing copy, links, or images. Trace the value from the template expression to `.Site.Params`, `i18n`, page front matter/content, `data/`, theme defaults, or `exampleSite` config, and verify the rendered HTML after the change.
-
-Keep site-specific copy, social links, hero/about text, profile data, and production URLs in the site layer whenever the template supports it: root config, site `i18n/`, site `content/`, or site `data/`. Change `themes/<theme>/i18n/`, default params, or theme demo content only for reusable theme defaults, fallback strings, or `exampleSite` behavior. Do not assume editing a theme-level i18n key affects the live site; site params and site i18n can override or bypass it.
-
-If visible text is assembled from multiple params or i18n keys, such as prefix/accent/suffix hero copy, inspect the final rendered sentence in each affected language. Check grammar, punctuation, wrapping, and whether the intended key is used rather than merely present in an unused translation file.
+When repairing or updating an existing Hugo site that uses a theme, read `references/repair-existing-site.md` before editing site copy, links, images, params, i18n, or generated output.
 
 ## ExampleSite Generation
 
@@ -85,13 +83,7 @@ For publishable demo assets, exclude real people, personal identifiers, readable
 
 ## Telegram Instant View Support
 
-When the user asks for Telegram Instant View support, or when preparing a publishable article-focused theme where Telegram sharing matters:
-
-- Add stable article selectors such as `article[data-iv-article]`, `.iv-title`, `[data-iv-published]`, `[data-iv-content]`, optional `[data-iv-cover]`, and `[data-iv-remove]` on UI chrome.
-- Add article metadata in `head`, including canonical/description, Open Graph article fields, `og:image`, publish/modified time, author, and optional JSON-LD.
-- Support front matter for author and cover/image fields.
-- Add render hooks when missing: images as `figure` with captions, code blocks with language metadata, and escaped fenced code (`{{ .Inner | htmlEscape | safeHTML }}` if `safeHTML` is needed).
-- Include `docs/telegram-instant-view.tpl` from `assets/telegram-instant-view.tpl` when useful, adapt path rules, and document that Telegram IV must be configured and validated per live domain.
+When the user asks for Telegram Instant View support, or when preparing a publishable article-focused theme where Telegram sharing matters, read `references/telegram-instant-view.md`.
 
 ## Hugo Implementation Rules
 
@@ -141,22 +133,7 @@ When delivering a full site plus theme, set the theme in site config (`theme = "
 
 ## Local Site Validation
 
-For visual checks of an existing site, especially when its production config has a real `baseURL`, run the local server with an explicit local base URL and in-memory rendering:
-
-```bash
-hugo server -D --bind 127.0.0.1 --baseURL http://127.0.0.1:1313/ --renderToMemory --noBuildLock
-```
-
-If the site needs an explicit theme or source path, add the existing project flags such as `--source`, `--theme`, or `--themesDir` without dropping `--baseURL http://127.0.0.1:1313/` or `--renderToMemory`. Do not trust a browser screenshot until you smoke-check that local HTML is not loading CSS, JavaScript, or image assets from the configured production host:
-
-```bash
-curl -s http://127.0.0.1:1313/ | rg "https?://<production-host>|stylesheet|script src|images/"
-curl -I http://127.0.0.1:1313/css/<known-file>.css
-```
-
-For multilingual sites, smoke-check the affected language branches and pages, such as `/ru/`, `/ru/about/`, `/en/`, and `/en/about/`. Grep the rendered HTML for changed copy or links so unused params and unused i18n keys are caught before visual review.
-
-Keep production builds separate from local server validation. Use `hugo server --renderToMemory` for visual checks, run `hugo --gc --minify` or other production builds separately, and treat generated `public/` output as build output unless the user explicitly asked to edit committed generated files.
+For visual checks of an existing site, especially when its production config has a real `baseURL`, read `references/repair-existing-site.md`.
 
 ## UX/UI Review
 
