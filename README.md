@@ -1,8 +1,8 @@
 # Hugo Theme From Design
 
-Codex skill for creating, updating, and repairing Hugo themes from design references such as Figma frames, exported assets, screenshots, or existing Hugo theme repositories.
+Skill for creating, updating, and repairing Hugo themes from design references such as Figma frames, exported assets, screenshots, or existing Hugo theme repositories. It is designed for Codex and other agent runners that load `SKILL.md`.
 
-The skill is aimed at turning a visual design into a reusable Hugo theme package, not just a static screenshot match. It guides Codex through theme scaffolding, `exampleSite` generation, Hugo build validation, preview image capture, and package-readiness checks for public theme repositories, including configurable footer attribution.
+The skill is aimed at turning a visual design into a reusable Hugo theme package, not just a static screenshot match. It guides the agent through theme scaffolding, `exampleSite` generation, Hugo build validation, preview image capture, and package-readiness checks for public theme repositories, including configurable footer attribution.
 
 For publishable themes, the skill also guides neutral demo favicon/webmanifest assets when the theme owns `<head>` metadata. Favicons should use a simplified high-contrast mark that remains readable at 16x16 and 32x32, not a tiny crop of a detailed hero image.
 
@@ -12,7 +12,7 @@ For publishable blog, magazine, documentation, and long-form article themes, the
 
 ## When to use it
 
-Use `$hugo-theme-from-design` when you want Codex to:
+Use `$hugo-theme-from-design` when you want an agent to:
 
 - create a new Hugo theme variant from a Figma frame, PNG, or JPG reference;
 - match an existing Hugo theme to a visual design;
@@ -22,9 +22,9 @@ Use `$hugo-theme-from-design` when you want Codex to:
 
 ## What it includes
 
-- `SKILL.md` - the main workflow and implementation rules for Codex.
+- `SKILL.md` - the main workflow and implementation rules for agents.
 - `assets/telegram-instant-view.tpl` - reusable starting template for optional Telegram Instant View support in article-focused themes.
-- `references/` - Hugo packaging notes, UI review guidance, and theme tutorial findings.
+- `references/` - Hugo packaging notes, UI review guidance, theme tutorial findings, Telegram IV details, and existing-site repair guidance.
 - `scripts/hugo_theme_check.py` - structural checks, metadata checks, and optional Hugo smoke builds.
 - `scripts/render_theme_preview.py` - headless browser capture for `images/screenshot.png` and `images/tn.png`.
 - `tests/` - unit tests for the helper scripts.
@@ -32,7 +32,7 @@ Use `$hugo-theme-from-design` when you want Codex to:
 
 ## Requirements
 
-- Codex with local skills support.
+- Codex with local skills support, or another agent runner that loads `SKILL.md`.
 - Hugo available on `PATH` for build validation.
   Tested with Hugo `v0.162.1+extended+withdeploy`.
 - Python 3.10 or newer for the helper scripts.
@@ -69,7 +69,7 @@ mkdir -p .agents/skills
 git clone https://github.com/dukebarman/hugo-theme-from-design.git .agents/skills/hugo-theme-from-design
 ```
 
-Then invoke it in Codex with:
+Then invoke it in Codex, or in another compatible runner, with:
 
 ```text
 Use $hugo-theme-from-design to create a Hugo theme from this screenshot.
@@ -77,11 +77,11 @@ Use $hugo-theme-from-design to create a Hugo theme from this screenshot.
 
 ## Typical workflow
 
-1. Provide Codex with a design reference, such as a screenshot, Figma export, or existing theme repository.
+1. Provide the agent with a design reference, such as a screenshot, Figma export, or existing theme repository.
 2. Ask for a new variant, a compatible port, an update, or a repair.
-3. Codex inspects the Hugo project, scaffolds or updates the theme, and creates an `exampleSite` when appropriate.
-4. Codex validates the result with Hugo and the bundled checker.
-5. For publishable themes, Codex can capture preview images and run additional package-readiness checks.
+3. The agent inspects the Hugo project, scaffolds or updates the theme, and creates an `exampleSite` when appropriate.
+4. The agent validates the result with Hugo and the bundled checker.
+5. For publishable themes, the agent can capture preview images and run additional package-readiness checks.
 
 ## Helper commands
 
@@ -114,11 +114,12 @@ unrelated social profiles, when demo PNG/JPG assets under `static/images` are
 oversized, and when code block render hooks pass `.Inner` to `safeHTML` without
 `htmlEscape`.
 
-When a theme declares Telegram Instant View support in its README or includes
-`docs/telegram-instant-view.tpl`, publication checks emit warning-level
-guidance for stable article selectors, article metadata, image metadata, README
-documentation, and per-domain Telegram template wording. These checks are not
-errors and are not applied to themes that do not declare IV support.
+When a theme includes `docs/telegram-instant-view.tpl`, or positively documents
+Telegram Instant View support in its README, publication checks emit
+warning-level guidance for stable article selectors, article metadata, image
+metadata, README documentation, and per-domain Telegram template wording. These
+checks are not errors and are not applied to themes that do not declare IV
+support.
 
 Validate a known-theme port:
 
@@ -134,6 +135,10 @@ python3 scripts/render_theme_preview.py \
   --theme-dir /path/to/theme
 ```
 
+Chrome or Chromium is preferred for JavaScript-heavy themes because the helper
+can give Chromium a virtual time budget before capture. Firefox capture uses a
+temporary profile for reliability, but it has no equivalent built-in wait flag.
+
 Run the unit tests:
 
 ```bash
@@ -142,7 +147,7 @@ python3 -m unittest discover -s tests
 
 ## Development notes
 
-Keep `SKILL.md` focused on instructions Codex should follow during task execution. Put longer background material, checklists, and research notes in `references/` so the skill can load them only when relevant.
+Keep `SKILL.md` focused on instructions the agent should follow during task execution. Put longer background material, checklists, and research notes in `references/` so the skill can load them only when relevant.
 
 When updating helper scripts, add or update focused tests under `tests/` and run the full unittest suite before publishing changes.
 
@@ -172,7 +177,7 @@ icon becomes a dark blob, loses its silhouette, or depends on fine detail.
 ## Telegram Instant View
 
 The skill treats Telegram Instant View as an optional publication pattern for
-article-focused Hugo themes. When requested, Codex should add stable selectors
+article-focused Hugo themes. When requested, the agent should add stable selectors
 such as `article[data-iv-article]`, `.iv-title`, `[data-iv-published]`,
 `[data-iv-content]`, optional `[data-iv-cover]`, and `[data-iv-remove]` for UI
 chrome that should not appear in the rendered article.

@@ -5,6 +5,7 @@ import importlib.util
 import io
 import json
 import struct
+import subprocess
 import sys
 import tempfile
 import unittest
@@ -82,6 +83,36 @@ class HugoThemeCheckTests(unittest.TestCase):
             self.assertEqual(result["warnings"], [])
             self.assertTrue(data["defaultContentLanguageInSubdir"])
             self.assertEqual(data["languages"]["en"]["languageName"], "English")
+
+    def test_read_toml_warns_on_complex_fallback_syntax(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            config = Path(tmp) / "hugo.toml"
+            config.write_text(
+                "\n".join(
+                    [
+                        'description = """Long',
+                        'text"""',
+                        "[[menu.main]]",
+                        'name = "Docs"',
+                    ]
+                ),
+                encoding="utf-8",
+            )
+            result = {"warnings": [], "info": [], "errors": []}
+
+            with mock.patch.object(hugo_theme_check, "tomllib", None):
+                data = hugo_theme_check.read_toml(config, result)
+
+            self.assertEqual(data, {})
+            self.assertEqual(result["errors"], [])
+            self.assertTrue(any("Complex TOML syntax" in warning["message"] for warning in result["warnings"]))
+
+    def test_run_command_returns_structured_timeout_failure(self) -> None:
+        with mock.patch.object(hugo_theme_check.subprocess, "run", side_effect=subprocess.TimeoutExpired(["hugo"], 2)):
+            code, output = hugo_theme_check.run_command(["hugo", "version"], Path("/tmp"), 2)
+
+        self.assertEqual(code, 124)
+        self.assertIn("Command timed out after 2s", output)
 
     def test_classify_root_content_support_vs_sample(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
@@ -382,6 +413,28 @@ class HugoThemeCheckTests(unittest.TestCase):
             hugo_theme_check.check_telegram_instant_view(result, theme)
 
             self.assertEqual(result["warnings"], [])
+
+    def test_telegram_instant_view_ignores_negative_readme_mention(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            theme = Path(tmp)
+            (theme / "layouts").mkdir()
+            (theme / "README.md").write_text("What we don't support: Telegram Instant View.\n", encoding="utf-8")
+            result = {"warnings": [], "info": [], "errors": []}
+
+            hugo_theme_check.check_telegram_instant_view(result, theme)
+
+            self.assertEqual(result["warnings"], [])
+
+    def test_telegram_instant_view_warns_for_positive_readme_declaration(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            theme = Path(tmp)
+            (theme / "layouts").mkdir()
+            (theme / "README.md").write_text("This theme supports Telegram Instant View article templates.\n", encoding="utf-8")
+            result = {"warnings": [], "info": [], "errors": []}
+
+            hugo_theme_check.check_telegram_instant_view(result, theme)
+
+            self.assertTrue(any("data-iv-article" in warning["message"] for warning in result["warnings"]))
 
     def test_telegram_instant_view_warns_when_declared_but_incomplete(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:

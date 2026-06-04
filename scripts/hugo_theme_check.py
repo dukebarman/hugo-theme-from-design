@@ -125,6 +125,31 @@ FOOTER_ATTRIBUTION_I18N_HINTS = (
 )
 TELEGRAM_IV_TEMPLATE = "docs/telegram-instant-view.tpl"
 TELEGRAM_IV_README_RE = re.compile(r"\b(?:telegram\s+instant\s+view|telegram\s+iv|instant\s+view)\b", re.IGNORECASE)
+TELEGRAM_IV_README_POSITIVE_TERMS = (
+    "support",
+    "supports",
+    "supported",
+    "prepares",
+    "prepare",
+    "template",
+    "configure",
+    "validate",
+    "selector",
+    "selectors",
+    "metadata",
+)
+TELEGRAM_IV_README_NEGATIVE_TERMS = (
+    "don't support",
+    "do not support",
+    "doesn't support",
+    "does not support",
+    "not support",
+    "no support",
+    "unsupported",
+    "what we don't support",
+    "do not include",
+    "does not include",
+)
 TELEGRAM_IV_AUTO_TERMS = (
     "automatic",
     "automatically",
@@ -173,6 +198,7 @@ EXAMPLE_SITE_BASEURL = "https://example.com/"
 BASEURL_TOML_YAML_RE = re.compile(r"""(?im)^\s*baseURL\s*[:=]\s*["']?(?P<url>[^"'\s#]+)""")
 BASEURL_JSON_RE = re.compile(r'''"baseURL"\s*:\s*"(?P<url>[^"]+)"''')
 BASEURL_LINE_RE = re.compile(r"""^\s*"?baseURL"?\s*[:=]""", re.IGNORECASE)
+BASIC_TOML_COMPLEX_RE = re.compile(r"""(?m)^\s*\[\[|'''|\"\"\"|=\s*\{""")
 EXTERNAL_CDN_URL_RE = re.compile(
     r"""(?P<url>(?:https?:)?//(?:(?:cdn|ajax|maxcdn|stackpath)\.[^/"'`\s<>)]*|cdn\.jsdelivr\.net|unpkg\.com|cdnjs\.cloudflare\.com|fonts\.googleapis\.com|fonts\.gstatic\.com|ajax\.googleapis\.com|maxcdn\.bootstrapcdn\.com|stackpath\.bootstrapcdn\.com)[^"'`\s<>)]*)""",
     re.IGNORECASE,
@@ -227,6 +253,14 @@ def read_toml(path: Path, result: dict) -> dict:
         text = path.read_text(encoding="utf-8")
         if tomllib is not None:
             return tomllib.loads(text)
+        if BASIC_TOML_COMPLEX_RE.search(text):
+            add(
+                result,
+                "warnings",
+                "Complex TOML syntax detected; install Python 3.11+ for full parsing or simplify this file for Python 3.10 fallback checks",
+                path,
+            )
+            return {}
         return parse_basic_toml(text)
     except Exception as exc:  # noqa: BLE001 - report parse failure as validation data
         add(result, "errors", f"Unable to parse TOML: {exc}", path)
@@ -298,15 +332,23 @@ def check_preview(result: dict, theme_dir: Path, stem: str, minimum: tuple[int, 
 
 
 def run_command(args: list[str], cwd: Path, timeout: int) -> tuple[int, str]:
-    completed = subprocess.run(
-        args,
-        cwd=str(cwd),
-        text=True,
-        stdout=subprocess.PIPE,
-        stderr=subprocess.STDOUT,
-        timeout=timeout,
-        check=False,
-    )
+    try:
+        completed = subprocess.run(
+            args,
+            cwd=str(cwd),
+            text=True,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.STDOUT,
+            timeout=timeout,
+            check=False,
+        )
+    except subprocess.TimeoutExpired as exc:
+        output = exc.stdout or exc.stderr or ""
+        if isinstance(output, bytes):
+            output = output.decode(errors="replace")
+        detail = output.strip()
+        message = f"Command timed out after {timeout}s"
+        return 124, f"{message}: {detail}" if detail else message
     return completed.returncode, completed.stdout.strip()
 
 
@@ -701,7 +743,19 @@ def readme_texts(theme_dir: Path) -> dict[Path, str]:
 def declares_telegram_instant_view(theme_dir: Path) -> bool:
     if (theme_dir / TELEGRAM_IV_TEMPLATE).exists():
         return True
-    return any(TELEGRAM_IV_README_RE.search(text) for text in readme_texts(theme_dir).values())
+    return any(readme_declares_telegram_instant_view(text) for text in readme_texts(theme_dir).values())
+
+
+def readme_declares_telegram_instant_view(text: str) -> bool:
+    for raw_line in text.splitlines():
+        if not TELEGRAM_IV_README_RE.search(raw_line):
+            continue
+        line = raw_line.lower()
+        if any(term in line for term in TELEGRAM_IV_README_NEGATIVE_TERMS):
+            continue
+        if any(term in line for term in TELEGRAM_IV_README_POSITIVE_TERMS):
+            return True
+    return False
 
 
 def check_telegram_instant_view(result: dict, theme_dir: Path) -> None:
@@ -832,7 +886,7 @@ def check_subpath_safe_user_paths(result: dict, theme_dir: Path) -> None:
             add(
                 result,
                 "warnings",
-                f"Publication check: user-facing URL '{url_path}' is root-relative. Prefer relative paths such as 'images/...' or 'posts/...' in README/config/front matter so deployments under subpaths work.",
+                f"Publication check: user-facing URL '{url_path}' is root-relative. Prefer relative paths such as 'images/...' or 'posts/...' in README/config/front matter so deployments under subpaths work. Review Hugo config keys such as permalinks, pageRef, menus, and mounts before changing them.",
                 path,
             )
             warnings += 1
