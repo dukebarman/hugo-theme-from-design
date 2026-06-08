@@ -204,6 +204,10 @@ EXTERNAL_CDN_URL_RE = re.compile(
     re.IGNORECASE,
 )
 SAFEHTML_INNER_PIPELINE_RE = re.compile(r"""\.Inner(?:\s*\|\s*[\w.]+)*\s*\|\s*safeHTML""")
+HUGO_ISNODE_RE = re.compile(r"""\.IsNode\b""")
+HUGO_TO_CSS_RE = re.compile(r"""\b(?:resources\.)?ToCSS\b""")
+GLOBAL_IMAGING_SETTING_RE = re.compile(r"""(?im)^\s*(?:quality|compression)\s*=""")
+IMAGING_TABLE_RE = re.compile(r"""(?im)^\s*\[imaging\]\s*$""")
 DEMO_SOCIAL_PATTERNS = (
     (re.compile(r"https?://example\.org/@[A-Za-z0-9_.-]+", re.IGNORECASE), "example.org/@... demo profile link"),
     (re.compile(r"https?://(?:www\.)?linkedin\.com/", re.IGNORECASE), "LinkedIn demo social link"),
@@ -1065,6 +1069,56 @@ def check_safe_code_render_hooks(result: dict, theme_dir: Path) -> None:
             break
 
 
+def check_hugo_deprecations(result: dict, theme_dir: Path) -> None:
+    warnings = 0
+    for path, text in collect_text_from_roots([theme_dir / "layouts", theme_dir / "assets"]).items():
+        if HUGO_ISNODE_RE.search(text):
+            add(
+                result,
+                "warnings",
+                "Publication check: template uses deprecated .IsNode. Prefer .IsBranch for Hugo v0.163+ unless preserving an old theme contract requires otherwise.",
+                path,
+            )
+            warnings += 1
+        if HUGO_TO_CSS_RE.search(text):
+            add(
+                result,
+                "warnings",
+                "Publication check: template uses deprecated resources.ToCSS/ToCSS. Prefer css.Sass for Sass pipelines in current Hugo.",
+                path,
+            )
+            warnings += 1
+        if warnings >= 8:
+            add(result, "info", "Skipped additional Hugo deprecation warnings after first 8 matches")
+            return
+
+    config_paths = [theme_dir / name for name in CONFIG_FILES + CONFIG_DIR_FILES if (theme_dir / name).exists()]
+    config_paths += example_site_config_paths(theme_dir)
+    for path in config_paths:
+        if path.suffix.lower() != ".toml":
+            continue
+        text = read_text_if_possible(path)
+        if not text or not IMAGING_TABLE_RE.search(text):
+            continue
+        sections = re.split(r"""(?m)^\s*\[[^\]]+\]\s*$""", text)
+        headers = re.findall(r"""(?m)^\s*\[([^\]]+)\]\s*$""", text)
+        for header, body in zip(headers, sections[1:]):
+            if header.strip() != "imaging":
+                continue
+            if GLOBAL_IMAGING_SETTING_RE.search(body):
+                add(
+                    result,
+                    "warnings",
+                    "Publication check: global imaging.quality or imaging.compression is deprecated in current Hugo. Prefer per-format imaging.webp or imaging.avif settings.",
+                    path,
+                )
+                warnings += 1
+            break
+        if warnings >= 8:
+            add(result, "info", "Skipped additional Hugo deprecation warnings after first 8 matches")
+            return
+
+
 def check_subpath_build(result: dict, build: tuple[Path, list[str]], timeout: int) -> None:
     cwd, command = build
     with tempfile.TemporaryDirectory(prefix="hugo-theme-check-subpath-") as destination:
@@ -1216,6 +1270,7 @@ def main() -> int:
             check_demo_social_links(result, theme_dir)
             check_demo_asset_sizes(result, theme_dir)
             check_safe_code_render_hooks(result, theme_dir)
+            check_hugo_deprecations(result, theme_dir)
 
         root_content = theme_dir / "content"
         if root_content.exists():

@@ -699,6 +699,53 @@ class HugoThemeCheckTests(unittest.TestCase):
 
             self.assertEqual(result["warnings"], [])
 
+    def test_hugo_deprecations_warns_for_old_template_apis(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            theme = Path(tmp)
+            (theme / "layouts").mkdir()
+            (theme / "assets" / "scss").mkdir(parents=True)
+            (theme / "layouts" / "section.html").write_text("{{ if .IsNode }}Branch{{ end }}\n", encoding="utf-8")
+            (theme / "layouts" / "baseof.html").write_text(
+                "{{ resources.Get \"scss/main.scss\" | resources.ToCSS }}\n",
+                encoding="utf-8",
+            )
+            result = {"warnings": [], "info": [], "errors": []}
+
+            hugo_theme_check.check_hugo_deprecations(result, theme)
+
+            messages = [warning["message"] for warning in result["warnings"]]
+            self.assertEqual(len(messages), 2)
+            self.assertTrue(any(".IsNode" in message for message in messages))
+            self.assertTrue(any("resources.ToCSS" in message for message in messages))
+
+    def test_hugo_deprecations_warns_for_global_imaging_config(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            theme = Path(tmp)
+            (theme / "hugo.toml").write_text(
+                "[imaging]\nquality = 82\ncompression = 'lossy'\n[imaging.avif]\nquality = 60\n",
+                encoding="utf-8",
+            )
+            result = {"warnings": [], "info": [], "errors": []}
+
+            hugo_theme_check.check_hugo_deprecations(result, theme)
+
+            self.assertEqual(len(result["warnings"]), 1)
+            self.assertIn("global imaging.quality", result["warnings"][0]["message"])
+
+    def test_hugo_deprecations_accepts_per_format_imaging_config(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            theme = Path(tmp)
+            (theme / "exampleSite").mkdir()
+            (theme / "exampleSite" / "hugo.toml").write_text(
+                "[imaging]\nanchor = 'smart'\n[imaging.avif]\nquality = 60\nhint = 'photo'\n[imaging.webp]\nquality = 75\n",
+                encoding="utf-8",
+            )
+            result = {"warnings": [], "info": [], "errors": []}
+
+            hugo_theme_check.check_hugo_deprecations(result, theme)
+
+            self.assertEqual(result["warnings"], [])
+
     def test_subpath_build_warns_on_failure(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             cwd = Path(tmp)
