@@ -166,11 +166,13 @@ Do not assume these paths exist in every installation, and do not copy example t
 - Put visual tokens in CSS custom properties or Sass variables where the existing pipeline supports it.
 - Keep navigation, footer links, socials, CTA labels, and hero content configurable through site params when practical.
 - Use Hugo image/resource pipelines for theme-owned assets that need fingerprinting, minification, resizing, or Sass compilation.
+- When configuring image output for current Hugo, keep format-specific tuning under `imaging.webp` and `imaging.avif` where practical. For Hugo `v0.163+`, avoid introducing deprecated global `imaging.quality` and `imaging.compression`; use per-format quality, compression, and hint settings when a theme needs AVIF/WebP-specific behavior.
 - Read replaceable presentation images from `.Site.Params`, page `.Params`, page resources, or data files with fallback defaults. Avoid template-only literals such as `/images/specific-person.jpg` for hero/about/avatar/profile imagery in reusable themes.
 - Normalize user-provided static URL params before applying `relURL`, `relLangURL`, `absURL`, or `absLangURL`; README/config/front matter examples should use `images/foo.jpg`, `posts/foo/`, or `tags/news/` instead of `/images/foo.jpg`, `/posts/foo/`, or `/tags/news/` so subpath deployments keep working. Avoid template literals such as `{{ "/images/foo.jpg" | relURL }}` or `{{ relLangURL "/tags/news/" }}`; pass relative inputs or trim leading slashes first.
 - In code block render hooks, preserve language metadata but escape fenced code content. Use `{{ .Inner | htmlEscape | safeHTML }}` if the hook needs `safeHTML`; never render fenced code as raw trusted HTML.
 - Prefer semantic HTML landmarks: `header`, `nav`, `main`, `article`, `section`, `aside`, `footer`.
 - Use `.IsHome`, `.Kind`, `.Section`, `.Type`, `.Params`, `.Site.Params`, menus, taxonomies, and partial dicts intentionally instead of duplicating templates.
+- Prefer `.IsBranch` over deprecated `.IsNode` on Hugo `v0.163+`. For older ports, replace `.IsNode` only when preserving the original theme behavior is straightforward to verify.
 - When the homepage design highlights a specific article/project, support an explicit front matter flag such as `featured = true` instead of assuming the latest dated content should appear first.
 - Keep templates resilient when params are missing. Use `with`, `default`, and `or` where appropriate.
 - Treat config params differently depending on output context: `markdownify` is appropriate for visible rich text, while metadata/attribute contexts should use plain text such as `{{ . | markdownify | plainify }}`.

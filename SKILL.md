@@ -72,6 +72,7 @@ Do not confuse a visually plausible prototype with a reusable theme product. Whe
 - implement pagination with Hugo pagination APIs when lists can exceed one page;
 - use real icon assets or an icon partial instead of unicode stand-ins for reusable theme UI;
 - make post images robust with page resources/static assets and resizing where practical;
+- for Hugo `v0.162+`, treat AVIF as a supported image-pipeline target. For Hugo `v0.163+`, avoid new global `imaging.quality` or `imaging.compression` configuration in reusable themes; prefer per-format settings under `imaging.webp` and `imaging.avif` when a theme needs to tune output quality, compression, or encoder hints;
 - make prominent theme images replaceable. Do not hard-code hero, avatar, about, profile, or social preview paths such as `/images/specific-person.jpg` directly into templates as the only source. Read them from `params`, front matter, page resources, or data files with documented fallback defaults, for example `params.heroImage`, `params.aboutImage`, `params.avatar`, and `params.images`;
 - keep user-facing URLs subpath-safe. In README examples, config params, archetypes, and front matter prefer `images/foo.jpg`, `posts/foo/`, and `tags/news/` over `/images/foo.jpg`, `/posts/foo/`, and `/tags/news/`; when template code receives a user path before `relURL`, `relLangURL`, `absURL`, or `absLangURL`, normalize accidental leading slashes so a non-root `baseURL` such as `https://example.org/blog/` still works;
 - add an unobtrusive publication footer attribution for reusable themes, separate from site author/copyright: `Theme <ThemeName> by <ThemeAuthor>.` Enable it by default, make it disableable through `params.footer.showThemeAttribution`, localize the sentence through i18n, support separate `themeURL` and `themeAuthorURL`, and document the params in README;
@@ -98,6 +99,8 @@ Prefer the repo's current Hugo style:
 - minimal dependencies unless the theme already uses npm/Vite/PostCSS/Sass.
 
 For Hugo `v0.146+`, prefer the modern template layout for new work unless the repository clearly uses legacy conventions. For existing themes, do not migrate `_default` to root templates or `partials` to `_partials` as an incidental change; only migrate when the user asks or Hugo build errors require it.
+
+For Hugo `v0.163+`, use `.IsBranch` for branch-page checks instead of deprecated `.IsNode`. When updating old themes, preserve behavior but replace `.IsNode` if the change is local and testable.
 
 Ensure child templates define the same blocks used by the base template, typically `{{ define "main" }}`. When calling partials that need page/site data, pass context explicitly with `.` or a focused `dict`.
 
