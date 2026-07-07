@@ -124,6 +124,7 @@ FOOTER_ATTRIBUTION_I18N_HINTS = (
     "footer_theme_attribution",
 )
 TELEGRAM_IV_TEMPLATE = "docs/telegram-instant-view.tpl"
+TELEGRAM_IV_VERSION_RULE = '~version: "2.1"'
 TELEGRAM_IV_README_RE = re.compile(r"\b(?:telegram\s+instant\s+view|telegram\s+iv|instant\s+view)\b", re.IGNORECASE)
 TELEGRAM_IV_README_POSITIVE_TERMS = (
     "support",
@@ -174,6 +175,11 @@ TELEGRAM_IV_IMAGE_FALLBACK_HINTS = (
     ".Param \"cover\"",
     "params.images",
     "params.cover",
+)
+TELEGRAM_IV_PATH_RULE_RE = re.compile(r"""^\s*\?path\s*:\s*(?P<value>.+?)\s*$""", re.IGNORECASE)
+TELEGRAM_IV_DIRECT_DATETIME_RE = re.compile(
+    r"""^\s*published_date!{0,2}\s*:\s*(?!\$@\s*$)[^#\n]*@datetime\b""",
+    re.IGNORECASE,
 )
 SUBPATH_BASEURL = "https://example.org/blog/"
 DEMO_ASSET_SIZE_LIMIT = 1 * 1024 * 1024
@@ -762,9 +768,89 @@ def readme_declares_telegram_instant_view(text: str) -> bool:
     return False
 
 
+def telegram_first_rule_line(text: str) -> str:
+    for raw_line in text.splitlines():
+        line = raw_line.split("#", 1)[0].strip()
+        if line:
+            return line
+    return ""
+
+
+def telegram_template_line_without_comment(raw_line: str) -> str:
+    return raw_line.split("#", 1)[0].strip()
+
+
+def example_site_language_subdir_codes(theme_dir: Path, result: dict) -> list[str]:
+    example_site = theme_dir / "exampleSite"
+    if not example_site.exists():
+        return []
+    config = example_site_config(example_site, result)
+    languages = config.get("languages", {}) if isinstance(config, dict) else {}
+    if not isinstance(languages, dict) or len(languages) < 2 or not config.get("defaultContentLanguageInSubdir"):
+        return []
+    return sorted(str(code) for code in languages.keys())
+
+
+def telegram_path_rule_is_posts_only(value: str, language_codes: list[str]) -> bool:
+    normalized = value.replace("\\/", "/").strip().strip('"').strip("'")
+    if not re.match(r"""^(?:\^|\\A)?/?posts(?:/|$)""", normalized):
+        return False
+    if "[a-z]{2}" in normalized or "[a-z][a-z]" in normalized:
+        return False
+    for code in language_codes:
+        if re.search(rf"""(?:^|[/|(]){re.escape(code)}(?:[/|)])""", normalized):
+            return False
+    return True
+
+
+def check_telegram_iv_template(result: dict, theme_dir: Path) -> None:
+    template = theme_dir / TELEGRAM_IV_TEMPLATE
+    if not template.exists():
+        return
+    text = read_text_if_possible(template)
+    if not text:
+        return
+
+    first_rule = telegram_first_rule_line(text)
+    if first_rule != TELEGRAM_IV_VERSION_RULE:
+        add(
+            result,
+            "warnings",
+            f"Telegram Instant View check: docs/telegram-instant-view.tpl first rule should be {TELEGRAM_IV_VERSION_RULE}",
+            template,
+        )
+
+    for raw_line in text.splitlines():
+        line = telegram_template_line_without_comment(raw_line)
+        if TELEGRAM_IV_DIRECT_DATETIME_RE.search(line):
+            add(
+                result,
+                "warnings",
+                "Telegram Instant View check: published_date should use @datetime(...) and then published_date: $@, not a raw @datetime attribute",
+                template,
+            )
+            break
+
+    language_codes = example_site_language_subdir_codes(theme_dir, result)
+    if not language_codes:
+        return
+    for raw_line in text.splitlines():
+        line = telegram_template_line_without_comment(raw_line)
+        match = TELEGRAM_IV_PATH_RULE_RE.match(line)
+        if match and telegram_path_rule_is_posts_only(match.group("value"), language_codes):
+            add(
+                result,
+                "warnings",
+                "Telegram Instant View check: multilingual exampleSite uses defaultContentLanguageInSubdir, but ?path only covers /posts/... and may miss language-prefixed URLs",
+                template,
+            )
+            break
+
+
 def check_telegram_instant_view(result: dict, theme_dir: Path) -> None:
     if not declares_telegram_instant_view(theme_dir):
         return
+    check_telegram_iv_template(result, theme_dir)
 
     implementation_roots = [
         theme_dir / "layouts",

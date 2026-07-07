@@ -456,6 +456,61 @@ class HugoThemeCheckTests(unittest.TestCase):
             self.assertTrue(any("official Telegram Instant View documentation" in message for message in messages))
             self.assertTrue(any("should not describe IV as automatic" in message for message in messages))
 
+    def test_telegram_instant_view_warns_when_template_version_not_first_rule(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            theme = Path(tmp)
+            (theme / "docs").mkdir()
+            (theme / "docs" / "telegram-instant-view.tpl").write_text(
+                "?path: /posts/.+\n~version: \"2.1\"\n",
+                encoding="utf-8",
+            )
+            result = {"warnings": [], "info": [], "errors": []}
+
+            hugo_theme_check.check_telegram_instant_view(result, theme)
+
+            self.assertTrue(any("first rule should be" in warning["message"] for warning in result["warnings"]))
+
+    def test_telegram_instant_view_warns_for_raw_datetime_attribute(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            theme = Path(tmp)
+            (theme / "docs").mkdir()
+            (theme / "docs" / "telegram-instant-view.tpl").write_text(
+                '~version: "2.1"\npublished_date: //time[@data-iv-published]/@datetime\n',
+                encoding="utf-8",
+            )
+            result = {"warnings": [], "info": [], "errors": []}
+
+            hugo_theme_check.check_telegram_instant_view(result, theme)
+
+            self.assertTrue(any("published_date should use @datetime" in warning["message"] for warning in result["warnings"]))
+
+    def test_telegram_instant_view_warns_for_posts_only_path_in_multilingual_example_site(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            theme = Path(tmp)
+            (theme / "docs").mkdir()
+            (theme / "exampleSite").mkdir()
+            (theme / "docs" / "telegram-instant-view.tpl").write_text(
+                '~version: "2.1"\n?path: /posts/.+\n',
+                encoding="utf-8",
+            )
+            (theme / "exampleSite" / "hugo.toml").write_text(
+                "\n".join(
+                    [
+                        "defaultContentLanguageInSubdir = true",
+                        "[languages.en]",
+                        "languageName = 'English'",
+                        "[languages.ru]",
+                        "languageName = 'Russian'",
+                    ]
+                ),
+                encoding="utf-8",
+            )
+            result = {"warnings": [], "info": [], "errors": []}
+
+            hugo_theme_check.check_telegram_instant_view(result, theme)
+
+            self.assertTrue(any("language-prefixed URLs" in warning["message"] for warning in result["warnings"]))
+
     def test_telegram_instant_view_accepts_publication_contract(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             theme = Path(tmp)
