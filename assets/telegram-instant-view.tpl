@@ -10,16 +10,19 @@
 ?path: /([a-z]{2}/)?posts/.+
 !exists: //article[@data-iv-article]
 
-$article: //article[@data-iv-article]
-$body: $article//*[@data-iv-content]
+$article: (//article[@data-iv-article])[1]
+$body: ($article//*[@data-iv-content])[1]
 
 @remove: $article//*[contains(@data-iv-remove, "true")]
 @remove: //script
 @remove: //style
 @remove: //noscript
 
-title: $article//h1[contains(concat(" ", normalize-space(@class), " "), " iv-title ")]
-@datetime(0): $article//time[@data-iv-published]/@datetime
+@split_parent: $body//p/figure
+@split_parent: $body//p/img
+
+title: ($article//h1[has-class("iv-title")])[1]
+@datetime(0, "en-US", "yyyy-MM-dd'T'HH:mm:ssXXX"): ($article//time[@data-iv-published]/@datetime)[1]
 published_date: $@
 author: //meta[@property="article:author"]/@content
 author_url: //meta[@property="article:author:url"]/@content

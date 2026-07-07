@@ -25,3 +25,9 @@ Typical causes of `No Instant View available`:
 - The `?path` rule does not cover the actual article URL, especially `/ru/posts/...` or other language-prefixed paths.
 - The rendered page does not expose a required `title` or `body` selector.
 - `published_date` is assigned directly from an HTML `datetime` attribute instead of converting it with `@datetime(...)` and then using `published_date: $@`.
+
+## Troubleshooting
+
+- If Telegram reports `Element <img> is not supported in <p>`, add `@split_parent` rules for `$body//p/figure` and `$body//p/img`.
+- This usually comes from old Markdown content where an image is not separated from the previous paragraph by a blank line, so Hugo/Goldmark can render a `figure` or `img` inside `<p>`.
+- Prefer fixing this in the IV template as a compatibility layer, not only by manually editing individual content files.
