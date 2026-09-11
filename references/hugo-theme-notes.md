@@ -7,7 +7,7 @@ Use this reference for Hugo-specific structure, theme publication checks, and ex
 - `hugo new theme <name>` creates a functional theme with template examples and sample content in `./themes`.
 - A generated theme skeleton contains `archetypes/`, `assets/`, `content/`, `data/`, `i18n/`, `layouts/`, `static/`, and `hugo.toml`.
 - Hugo's unified file system mounts theme directories onto the project. Project files take precedence over theme files at the same path.
-- The official docs pages checked for this skill were built with Hugo `v0.161.1`; the relevant pages were last updated on February 25, 2026 (`hugo new theme`) and March 11, 2026 (directory structure).
+- Release compatibility was reviewed through Hugo `v0.166.0` on 2026-09-11. Read [Hugo Version Compatibility](hugo-version-compatibility.md) for version-gated APIs and migration checks; a documentation site's build version does not establish a theme's minimum supported version.
 - Hugo `v0.146.0` introduced a new template system. The docs say `layouts/partials` became `layouts/_partials`, `layouts/_default` was removed, and common templates moved to the `layouts/` root. Hugo preserves backward compatibility for many legacy themes, so inspect before changing conventions.
 
 ## Theme Repository Checklist

@@ -102,6 +102,8 @@ For Hugo `v0.146+`, prefer the modern template layout for new work unless the re
 
 For Hugo `v0.163+`, use `.IsBranch` for branch-page checks instead of deprecated `.IsNode`. When updating old themes, preserve behavior but replace `.IsNode` if the change is local and testable.
 
+For upgrades or features requiring Hugo `v0.164+`, read `references/hugo-version-compatibility.md` before changing asset pipelines, syntax highlighting, content views, or template returns. It covers changes through `v0.166.0`, including build and URL compatibility. Match new APIs to the theme's declared minimum version and deployment Hugo version; do not raise the minimum solely because the local binary is newer.
+
 Ensure child templates define the same blocks used by the base template, typically `{{ define "main" }}`. When calling partials that need page/site data, pass context explicitly with `.` or a focused `dict`.
 
 If config params allow Markdown for visible text, render visible text with `markdownify` but sanitize metadata attributes with `markdownify | plainify` before placing them in `<meta>` tags, `title`, `aria-label`, or other plain-text attributes.

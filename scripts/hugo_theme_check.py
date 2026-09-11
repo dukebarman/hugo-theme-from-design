@@ -212,6 +212,7 @@ EXTERNAL_CDN_URL_RE = re.compile(
 SAFEHTML_INNER_PIPELINE_RE = re.compile(r"""\.Inner(?:\s*\|\s*[\w.]+)*\s*\|\s*safeHTML""")
 HUGO_ISNODE_RE = re.compile(r"""\.IsNode\b""")
 HUGO_TO_CSS_RE = re.compile(r"""\b(?:resources\.)?ToCSS\b""")
+HUGO_POST_PROCESS_RE = re.compile(r"""\bresources\.PostProcess\b""")
 GLOBAL_IMAGING_SETTING_RE = re.compile(r"""(?im)^\s*(?:quality|compression)\s*=""")
 IMAGING_TABLE_RE = re.compile(r"""(?im)^\s*\[imaging\]\s*$""")
 DEMO_SOCIAL_PATTERNS = (
@@ -1171,6 +1172,14 @@ def check_hugo_deprecations(result: dict, theme_dir: Path) -> None:
                 result,
                 "warnings",
                 "Publication check: template uses deprecated resources.ToCSS/ToCSS. Prefer css.Sass for Sass pipelines in current Hugo.",
+                path,
+            )
+            warnings += 1
+        if HUGO_POST_PROCESS_RE.search(text):
+            add(
+                result,
+                "warnings",
+                "Publication check: resources.PostProcess is deprecated in Hugo v0.164+. Migrate stats-dependent processing to templates.Defer with explicit context; this is not a pipeline-function rename. Preserve the theme's supported Hugo versions.",
                 path,
             )
             warnings += 1
