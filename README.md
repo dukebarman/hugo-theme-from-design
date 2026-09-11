@@ -34,11 +34,17 @@ Use `$hugo-theme-from-design` when you want an agent to:
 
 - Codex with local skills support, or another agent runner that loads `SKILL.md`.
 - Hugo available on `PATH` for build validation.
-  Tested with Hugo `v0.162.1+extended+withdeploy`.
+  Compatibility smoke checks passed with Hugo `v0.165.0+extended+withdeploy`
+  and `v0.166.0+extended`: normal/subpath builds, deferred CSS, and generated
+  Chroma styles; `v0.166.0` also covered custom `.Render` context and conditional
+  `return`. These are validation versions, not a required minimum for every theme.
 - Python 3.10 or newer for the helper scripts.
 - Firefox, Chrome, or Chromium for automated preview image capture.
 
 The skill can still guide implementation without every optional tool installed, but final validation is strongest when Hugo and a headless browser are available.
+
+See [Hugo version compatibility](references/hugo-version-compatibility.md) for
+changes through `v0.166.0`, version requirements, and migration checks.
 
 ## Installation
 
@@ -120,6 +126,11 @@ warning-level guidance for stable article selectors, article metadata, image
 metadata, README documentation, and per-domain Telegram template wording. These
 checks are not errors and are not applied to themes that do not declare IV
 support.
+
+Publication checks also flag deprecated `.IsNode`, `resources.ToCSS`,
+`resources.PostProcess`, and global imaging quality/compression settings in TOML.
+These warnings guide migration; use real builds to verify compatibility with the
+theme's supported Hugo versions.
 
 Validate a known-theme port:
 

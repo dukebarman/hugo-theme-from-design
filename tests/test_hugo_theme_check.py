@@ -787,6 +787,37 @@ class HugoThemeCheckTests(unittest.TestCase):
             self.assertEqual(len(result["warnings"]), 1)
             self.assertIn("global imaging.quality", result["warnings"][0]["message"])
 
+    def test_hugo_deprecations_warns_for_postprocess(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            theme = Path(tmp)
+            partial = theme / "layouts" / "_partials" / "css.html"
+            partial.parent.mkdir(parents=True)
+            partial.write_text(
+                '{{ $css := resources.Get "css/main.css" | css.PostCSS | resources.PostProcess }}\n',
+                encoding="utf-8",
+            )
+            result = {"warnings": [], "info": [], "errors": []}
+
+            hugo_theme_check.check_hugo_deprecations(result, theme)
+
+            self.assertEqual(len(result["warnings"]), 1)
+            self.assertIn("templates.Defer", result["warnings"][0]["message"])
+            self.assertEqual(result["errors"], [])
+
+    def test_hugo_deprecations_accepts_deferred_css(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            theme = Path(tmp)
+            (theme / "layouts").mkdir()
+            (theme / "layouts" / "baseof.html").write_text(
+                '{{ with (templates.Defer (dict "data" .)) }}{{ partial "css.html" . }}{{ end }}\n',
+                encoding="utf-8",
+            )
+            result = {"warnings": [], "info": [], "errors": []}
+
+            hugo_theme_check.check_hugo_deprecations(result, theme)
+
+            self.assertEqual(result["warnings"], [])
+
     def test_hugo_deprecations_accepts_per_format_imaging_config(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             theme = Path(tmp)
